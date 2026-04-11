@@ -27,7 +27,7 @@ export function Sidebar() {
           <div className="w-8 h-8 rounded-lg bg-[#865FDF] flex items-center justify-center flex-shrink-0">
             <GraduationCap size={16} className="text-white" />
           </div>
-          <span className="text-white font-semibold text-base tracking-tight">EduFlow</span>
+          <span className="text-white font-semibold text-base tracking-tight">LiveTrack</span>
         </Link>
       </div>
 

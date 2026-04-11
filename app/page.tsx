@@ -24,7 +24,7 @@ export default function LandingPage() {
           <div className="w-8 h-8 rounded-lg bg-[#865FDF] flex items-center justify-center">
             <GraduationCap size={16} className="text-white" />
           </div>
-          <span className="font-semibold text-lg tracking-tight">EduFlow</span>
+          <span className="font-semibold text-lg tracking-tight">LiveTrack</span>
         </div>
         <div className="flex items-center gap-3">
           <Link href="/lecturer" className="text-sm text-[#a0a0a0] hover:text-white transition-colors px-4 py-2">

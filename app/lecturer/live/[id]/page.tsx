@@ -29,6 +29,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   const [elapsed, setElapsed] = useState(lecture?.session?.elapsedSeconds ?? 0)
   const [linkCopied, setLinkCopied] = useState(false)
   const [slidesReady, setSlidesReady] = useState(() => !!getSlides(id))
+  const [studentCount, setStudentCount] = useState(lecture?.studentCount ?? 0)
 
   // Auth guard
   useEffect(() => {
@@ -72,6 +73,18 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     const t = setInterval(() => setElapsed(e => e + 1), 1000)
     return () => clearInterval(t)
   }, [lecture?.status])
+
+  // Poll student count every 5s
+  useEffect(() => {
+    const fetchCount = () =>
+      fetch(`/api/lectures/${id}/student-count`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.count !== undefined) setStudentCount(d.count) })
+        .catch(() => {})
+    fetchCount()
+    const t = setInterval(fetchCount, 5000)
+    return () => clearInterval(t)
+  }, [id])
 
   // Poll for questions from server every 3s
   useEffect(() => {
@@ -193,7 +206,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
             </div>
             <div className="flex items-center gap-1.5 text-[#a0a0a0] text-xs">
               <Users size={12} />
-              <span>{lecture.studentCount}명</span>
+              <span>{studentCount}명</span>
             </div>
           </div>
           <Progress value={slideProgress} color="#865FDF" height={3} />

@@ -16,7 +16,7 @@ import { Progress } from '@/components/ui/progress'
 import { useLecture } from '@/contexts/lecture-context'
 import { useAuth } from '@/contexts/auth-context'
 import { formatElapsed } from '@/lib/mock-data'
-import { getSlides, getSlideRatio } from '@/lib/slide-store'
+import { getSlides, getSlideRatio, restoreSlides } from '@/lib/slide-store'
 import type { Question } from '@/lib/types'
 
 export default function LivePage({ params }: { params: Promise<{ id: string }> }) {
@@ -28,6 +28,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
 
   const [elapsed, setElapsed] = useState(lecture?.session?.elapsedSeconds ?? 0)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [slidesReady, setSlidesReady] = useState(() => !!getSlides(id))
 
   // Auth guard
   useEffect(() => {
@@ -54,7 +55,13 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   const knownQuestionsRef = useRef<Set<string> | null>(null)
   const dismissToast = useCallback((tid: string) => setToasts(t => t.filter(x => x.id !== tid)), [])
 
-  const slides = getSlides(id)
+  // Restore slides from IndexedDB if not in memory (e.g. after page reload)
+  useEffect(() => {
+    if (getSlides(id)) { setSlidesReady(true); return }
+    restoreSlides(id).then(ok => { if (ok) setSlidesReady(true) })
+  }, [id])
+
+  const slides = slidesReady ? getSlides(id) : undefined
   const currentSlideIndex = (lecture?.session?.currentSlide ?? 1) - 1
   const currentSlideImage = slides ? slides[currentSlideIndex] : undefined
   const currentSlideRatio = getSlideRatio(id, currentSlideIndex)

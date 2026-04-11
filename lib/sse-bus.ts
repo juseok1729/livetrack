@@ -17,7 +17,16 @@ function publishCount(lectureId: string) {
 export function sseSubscribe(lectureId: string, ctrl: Controller) {
   if (!subscribers.has(lectureId)) subscribers.set(lectureId, new Set())
   subscribers.get(lectureId)!.add(ctrl)
+  const count = getSubscriberCount(lectureId)
   publishCount(lectureId)
+  // Persist peak_students to DB (fire-and-forget)
+  import('@/lib/db').then(({ getDb }) => {
+    const db = getDb()
+    const row = db.prepare('SELECT peak_students FROM lectures WHERE id = ?').get(lectureId) as { peak_students: number } | undefined
+    if (row && count > (row.peak_students ?? 0)) {
+      db.prepare('UPDATE lectures SET peak_students = ? WHERE id = ?').run(count, lectureId)
+    }
+  }).catch(() => {})
 }
 
 export function sseUnsubscribe(lectureId: string, ctrl: Controller) {

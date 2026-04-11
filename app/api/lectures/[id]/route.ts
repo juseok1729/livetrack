@@ -34,6 +34,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.currentSlideImage !== undefined) { fields.push('current_slide_image = ?'); values.push(body.currentSlideImage) }
   if (body.startedAt !== undefined) { fields.push('started_at = ?'); values.push(body.startedAt) }
   if (body.currentStrokes !== undefined) { fields.push('current_strokes = ?'); values.push(body.currentStrokes) }
+  if (body.status === 'ended') { fields.push('ended_at = ?'); values.push(new Date().toISOString()) }
+  if (body.peakStudents !== undefined) { fields.push('peak_students = ?'); values.push(body.peakStudents) }
 
   if (fields.length === 0) return NextResponse.json({ error: 'No fields' }, { status: 400 })
   values.push(id)

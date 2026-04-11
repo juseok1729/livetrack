@@ -34,6 +34,8 @@ export interface LectureRow {
   current_slide_image: string | null
   current_strokes: string | null
   started_at: string | null
+  ended_at: string | null
+  peak_students: number
   created_by: string
   created_at: string
 }

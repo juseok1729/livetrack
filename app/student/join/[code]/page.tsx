@@ -29,6 +29,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
   const [summaryData, setSummaryData] = useState({ chapter: '', text: '' })
   const prevChapterIdRef = useRef('')
   const [panelOpen, setPanelOpen] = useState(true)
+  const [slideRatio, setSlideRatio] = useState<number>(16 / 9)
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const likedIdsRef = useRef(likedIds)
   likedIdsRef.current = likedIds
@@ -227,10 +228,28 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
         </div>
 
         <div className="flex-1 flex items-center justify-center p-8 relative">
-          <div className="w-full max-w-4xl aspect-video bg-[#1a1a1a] rounded-2xl border border-[#2a2a2a] relative overflow-hidden shadow-lg">
+          <div
+            className="bg-[#1a1a1a] rounded-2xl border border-[#2a2a2a] relative overflow-hidden shadow-lg"
+            style={{
+              aspectRatio: String(slideRatio),
+              maxHeight: 'calc(100vh - 7rem)',
+              maxWidth: '100%',
+              width: `min(100%, calc((100vh - 7rem) * ${slideRatio}))`,
+            }}
+          >
             {liveSlideImage ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={liveSlideImage} alt={`슬라이드 ${session?.currentSlide}`} className="w-full h-full object-contain" />
+              <img
+                src={liveSlideImage}
+                alt={`슬라이드 ${session?.currentSlide}`}
+                className="absolute inset-0 w-full h-full object-contain"
+                onLoad={e => {
+                  const img = e.currentTarget
+                  if (img.naturalWidth && img.naturalHeight) {
+                    setSlideRatio(img.naturalWidth / img.naturalHeight)
+                  }
+                }}
+              />
             ) : (
               <>
                 <div className="absolute inset-0 bg-gradient-to-br from-[#865FDF]/5 to-transparent" />

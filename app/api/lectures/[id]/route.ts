@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { getDb } from '@/lib/db'
 import { dbChaptersToType, dbLectureToType, type LectureRow } from '@/lib/lecture-helpers'
+import { ssePublish } from '@/lib/sse-bus'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -39,5 +40,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   db.prepare(`UPDATE lectures SET ${fields.join(', ')} WHERE id = ?`).run(...values)
 
   const updated = db.prepare('SELECT * FROM lectures WHERE id = ?').get(id) as LectureRow
+
+  // Push to SSE subscribers (students watching this lecture)
+  const event: Record<string, unknown> = {}
+  if (body.currentSlide !== undefined) event.currentSlide = body.currentSlide
+  if (body.currentChapterId !== undefined) event.currentChapterId = body.currentChapterId
+  if (body.currentSlideImage !== undefined) event.currentSlideImage = body.currentSlideImage
+  if (body.currentStrokes !== undefined) event.currentStrokes = body.currentStrokes
+  if (body.status !== undefined) event.status = body.status
+  if (Object.keys(event).length > 0) ssePublish(id, event)
+
   return NextResponse.json(dbLectureToType(updated, dbChaptersToType(id)))
 }

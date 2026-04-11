@@ -13,7 +13,8 @@ import type { Lecture, Question } from '@/lib/types'
 
 type Tab = 'chapters' | 'qa'
 const PANEL_KEY = 'eduflow_panel_open'
-const POLL_INTERVAL = 2500
+const POLL_INTERVAL = 2500       // questions
+const LECTURE_FALLBACK_MS = 10000 // lecture state fallback if SSE drops
 
 type StudentLecture = Lecture & { currentSlideImage?: string | null; currentStrokes?: string | null }
 
@@ -54,7 +55,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     })
   }
 
-  // Fetch lecture + questions
+  // Fetch lecture state (initial + fallback)
   const fetchLecture = useCallback(async () => {
     if (!user) return
     try {
@@ -63,22 +64,64 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
       const data = await res.json()
       if (!data) { setLecture(null); return }
       setLecture(data)
-      const qRes = await fetch(`/api/lectures/${data.id}/questions`)
+    } catch {}
+  }, [user, code])
+
+  // Fetch questions (separate polling)
+  const fetchQuestions = useCallback(async (lectureId: string) => {
+    try {
+      const qRes = await fetch(`/api/lectures/${lectureId}/questions`)
       if (qRes.ok) {
         const qs: Question[] = await qRes.json()
         const liked = likedIdsRef.current
         setQuestions(qs.map(q => ({ ...q, likedByMe: liked.has(q.id) })))
       }
     } catch {}
-  }, [user, code])
+  }, [])
 
-  // Initial load + polling
+  // Initial load + fallback polling (10s)
   useEffect(() => {
     if (!user) return
     fetchLecture()
-    const t = setInterval(fetchLecture, POLL_INTERVAL)
+    const t = setInterval(fetchLecture, LECTURE_FALLBACK_MS)
     return () => clearInterval(t)
   }, [user, fetchLecture])
+
+  // Question polling (2.5s)
+  useEffect(() => {
+    if (!user || !lecture?.id) return
+    fetchQuestions(lecture.id)
+    const t = setInterval(() => fetchQuestions(lecture.id), POLL_INTERVAL)
+    return () => clearInterval(t)
+  }, [user, lecture?.id, fetchQuestions])
+
+  // SSE: real-time lecture state push from server
+  useEffect(() => {
+    if (!user || !lecture?.id) return
+    const es = new EventSource(`/api/lectures/${lecture.id}/stream`)
+    es.onmessage = (e) => {
+      try {
+        const update = JSON.parse(e.data)
+        setLecture(prev => {
+          if (!prev) return prev
+          const next = { ...prev }
+          if (update.status !== undefined) next.status = update.status
+          if (update.currentSlideImage !== undefined) next.currentSlideImage = update.currentSlideImage
+          if (update.currentStrokes !== undefined) next.currentStrokes = update.currentStrokes
+          if ((update.currentSlide !== undefined || update.currentChapterId !== undefined) && next.session) {
+            next.session = {
+              ...next.session,
+              ...(update.currentSlide !== undefined && { currentSlide: update.currentSlide }),
+              ...(update.currentChapterId !== undefined && { currentChapterId: update.currentChapterId }),
+            }
+          }
+          return next
+        })
+      } catch { /* ignore malformed events */ }
+    }
+    // Browser auto-reconnects on error; no extra handling needed
+    return () => es.close()
+  }, [user, lecture?.id])
 
   // Detect chapter change → show AI summary
   useEffect(() => {

@@ -32,6 +32,7 @@ export interface LectureRow {
   current_slide: number
   current_chapter_id: string
   current_slide_image: string | null
+  current_strokes: string | null
   started_at: string | null
   created_by: string
   created_at: string

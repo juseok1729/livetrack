@@ -18,9 +18,10 @@ interface StrokeData {
 
 interface StrokeOverlayProps {
   lectureId: string
+  externalStrokeData?: string | null
 }
 
-export function StrokeOverlay({ lectureId }: StrokeOverlayProps) {
+export function StrokeOverlay({ lectureId, externalStrokeData }: StrokeOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const dataRef = useRef<StrokeData | null>(null)
 
@@ -92,7 +93,7 @@ export function StrokeOverlay({ lectureId }: StrokeOverlayProps) {
     }
   }, [lectureId, redraw])
 
-  // Listen for stroke updates from lecturer tab
+  // Listen for stroke updates from lecturer tab (same browser)
   useEffect(() => {
     const key = `eduflow-strokes-${lectureId}`
     function onStorage(e: StorageEvent) {
@@ -107,6 +108,17 @@ export function StrokeOverlay({ lectureId }: StrokeOverlayProps) {
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
   }, [lectureId, redraw])
+
+  // Use server-polled stroke data (cross-browser)
+  useEffect(() => {
+    if (externalStrokeData === undefined) return
+    if (externalStrokeData) {
+      try { dataRef.current = JSON.parse(externalStrokeData) } catch { /* ignore */ }
+    } else {
+      dataRef.current = null
+    }
+    redraw()
+  }, [externalStrokeData, redraw])
 
   return (
     <canvas

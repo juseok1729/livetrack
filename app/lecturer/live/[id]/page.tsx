@@ -122,6 +122,11 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   // Clear annotation strokes when the slide changes
   useEffect(() => {
     localStorage.removeItem(`eduflow-strokes-${id}`)
+    fetch(`/api/lectures/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentStrokes: null }),
+    }).catch(() => {})
   }, [lecture?.session?.currentSlide, id])
 
   // Toast notifications for new incoming questions

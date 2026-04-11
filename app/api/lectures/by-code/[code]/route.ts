@@ -11,5 +11,5 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ cod
   const row = db.prepare('SELECT * FROM lectures WHERE join_code = ? COLLATE NOCASE').get(code) as LectureRow | undefined
   if (!row) return NextResponse.json(null)
   const lecture = dbLectureToType(row, dbChaptersToType(row.id))
-  return NextResponse.json({ ...lecture, currentSlideImage: row.current_slide_image })
+  return NextResponse.json({ ...lecture, currentSlideImage: row.current_slide_image ?? null, currentStrokes: row.current_strokes ?? null })
 }

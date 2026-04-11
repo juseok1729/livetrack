@@ -32,6 +32,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.currentChapterId !== undefined) { fields.push('current_chapter_id = ?'); values.push(body.currentChapterId) }
   if (body.currentSlideImage !== undefined) { fields.push('current_slide_image = ?'); values.push(body.currentSlideImage) }
   if (body.startedAt !== undefined) { fields.push('started_at = ?'); values.push(body.startedAt) }
+  if (body.currentStrokes !== undefined) { fields.push('current_strokes = ?'); values.push(body.currentStrokes) }
 
   if (fields.length === 0) return NextResponse.json({ error: 'No fields' }, { status: 400 })
   values.push(id)

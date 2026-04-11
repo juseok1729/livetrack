@@ -15,7 +15,7 @@ type Tab = 'chapters' | 'qa'
 const PANEL_KEY = 'eduflow_panel_open'
 const POLL_INTERVAL = 2500
 
-type StudentLecture = Lecture & { currentSlideImage?: string | null }
+type StudentLecture = Lecture & { currentSlideImage?: string | null; currentStrokes?: string | null }
 
 export default function StudentJoinPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params)
@@ -240,7 +240,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
                 </div>
               </>
             )}
-            <StrokeOverlay lectureId={lecture.id} />
+            <StrokeOverlay lectureId={lecture.id} externalStrokeData={lecture.currentStrokes} />
             {session && (
               <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/60 rounded-lg px-3 py-1.5" style={{ zIndex: 20 }}>
                 <div className="w-1.5 h-1.5 rounded-full bg-[#865FDF]" />

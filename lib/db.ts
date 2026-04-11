@@ -74,6 +74,10 @@ function initSchema(db: Database.Database) {
       FOREIGN KEY (lecture_id) REFERENCES lectures(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+  `)
+  // Migration: add current_strokes column if not exists
+  try { db.exec('ALTER TABLE lectures ADD COLUMN current_strokes TEXT') } catch { /* already exists */ }
+  db.exec(`
     CREATE INDEX IF NOT EXISTS idx_lectures_code ON lectures(join_code);
     CREATE INDEX IF NOT EXISTS idx_lectures_creator ON lectures(created_by);
     CREATE INDEX IF NOT EXISTS idx_chapters_lecture ON chapters(lecture_id);

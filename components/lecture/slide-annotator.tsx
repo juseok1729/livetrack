@@ -33,9 +33,16 @@ function syncStrokes(lectureId: string, strokes: Stroke[], canvas: HTMLCanvasEle
       ...s,
       points: s.points.map(p => ({ x: p.x / width, y: p.y / height })),
     }))
+  const json = JSON.stringify({ width, height, strokes: normalized })
   try {
-    localStorage.setItem(`eduflow-strokes-${lectureId}`, JSON.stringify({ width, height, strokes: normalized }))
+    localStorage.setItem(`eduflow-strokes-${lectureId}`, json)
   } catch { /* ignore quota */ }
+  // Sync to server for cross-browser students
+  fetch(`/api/lectures/${lectureId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currentStrokes: json }),
+  }).catch(() => {})
 }
 
 export function SlideAnnotator({ onClose, lectureId }: SlideAnnotatorProps) {

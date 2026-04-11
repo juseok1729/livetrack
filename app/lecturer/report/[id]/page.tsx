@@ -26,6 +26,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
   const lecture = state.lectures.find(l => l.id === id)
   const [report, setReport] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [expandedChapterId, setExpandedChapterId] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`/api/lectures/${id}/report`)
@@ -196,19 +197,36 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
           {/* Chapter summary */}
           <Card className="p-6">
             <h2 className="text-sm font-semibold text-[#111111] mb-4">챕터 요약</h2>
-            <div className="flex flex-col gap-2">
-              {lecture.chapters.map((ch, i) => (
-                <div key={ch.id} className="flex items-center gap-3 py-2 border-b border-[#f3f3f3] last:border-0">
-                  <span className="text-[10px] font-bold text-[#cccccc] w-4">{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-[#111111] truncate">{ch.title}</p>
-                    <p className="text-[10px] text-[#aaaaaa]">슬라이드 {ch.slideRange[0]}–{ch.slideRange[1]}장</p>
+            <div className="flex flex-col">
+              {lecture.chapters.map((ch, i) => {
+                const isExpanded = expandedChapterId === ch.id
+                return (
+                  <div key={ch.id} className="border-b border-[#f3f3f3] last:border-0">
+                    <div className="flex items-center gap-3 py-2">
+                      <span className="text-[10px] font-bold text-[#cccccc] w-4">{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-[#111111] truncate">{ch.title}</p>
+                        <p className="text-[10px] text-[#aaaaaa]">슬라이드 {ch.slideRange[0]}–{ch.slideRange[1]}장</p>
+                      </div>
+                      {ch.summary ? (
+                        <button
+                          onClick={() => setExpandedChapterId(isExpanded ? null : ch.id)}
+                          className="text-[10px] text-[#865FDF] hover:text-[#7450cc] flex-shrink-0 flex items-center gap-0.5 transition-colors"
+                        >
+                          {isExpanded ? '접기 ▲' : '요약 보기 ▼'}
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-[#cccccc] flex-shrink-0">요약 없음</span>
+                      )}
+                    </div>
+                    {isExpanded && ch.summary && (
+                      <div className="mx-7 mb-3 p-3 bg-[#f8f6ff] border border-[#865FDF]/15 rounded-xl">
+                        <p className="text-xs text-[#444444] leading-relaxed whitespace-pre-wrap">{ch.summary}</p>
+                      </div>
+                    )}
                   </div>
-                  {ch.summary && (
-                    <span className="text-[10px] text-[#865FDF] flex-shrink-0">요약 있음</span>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
           </Card>
 

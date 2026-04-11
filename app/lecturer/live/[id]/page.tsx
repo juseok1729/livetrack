@@ -291,7 +291,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
               aspectRatio: String(currentSlideRatio),
               maxHeight: 'calc(100vh - 7rem)',
               maxWidth: '100%',
-              width: currentSlideRatio >= 1 ? '100%' : 'auto',
+              width: `min(100%, calc((100vh - 7rem) * ${currentSlideRatio}))`,
             }}
           >
             {currentSlideImage ? (

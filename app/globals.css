@@ -1,26 +1,89 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: #ffffff;
+  --color-foreground: #111111;
+
+  /* Sidebar */
+  --color-sidebar: #0a0a0a;
+  --color-sidebar-hover: #1a1a1a;
+  --color-sidebar-border: #2a2a2a;
+  --color-sidebar-text: #ffffff;
+  --color-sidebar-muted: #a0a0a0;
+
+  /* Purple accent */
+  --color-purple: #865FDF;
+  --color-purple-hover: #7450cc;
+  --color-purple-light: #f0ebff;
+  --color-purple-muted: #c4aff5;
+
+  /* Content */
+  --color-content: #f8f8f8;
+  --color-border: #e5e5e5;
+  --color-muted: #555555;
+  --color-muted-bg: #f3f3f3;
+
+  /* Status */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-destructive: #ef4444;
+
+  --font-sans: Inter, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d0d0d0;
+  border-radius: 2px;
+}
+
+/* Sidebar scrollbar */
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+}
+
+/* Animations */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.animate-slide-up    { animation: slideUp 0.3s ease both; }
+.animate-fade-in     { animation: fadeIn 0.25s ease both; }
+.animate-slide-left  { animation: slideInLeft 0.3s ease both; }
+.animate-slide-right { animation: slideInRight 0.3s ease both; }
+.animate-pulse-soft  { animation: pulse-soft 2s ease infinite; }

@@ -1,0 +1,48 @@
+name: Deploy to Remote Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+
+            cd ~/Projects/deploy/livetrack
+
+            ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+            git pull origin main
+
+            docker compose -f docker-compose.yml down
+            docker compose -f docker-compose.yml build --no-cache
+            docker compose -f docker-compose.yml up -d
+
+            # 컨테이너 정상 구동 대기 (최대 30초)
+            echo "Waiting for container to be healthy..."
+            for i in $(seq 1 6); do
+              sleep 5
+              STATUS=$(docker inspect --format='{{.State.Status}}' livetrack 2>/dev/null || echo "missing")
+              if [ "$STATUS" = "running" ]; then
+                echo "Container is running."
+                break
+              fi
+              if [ "$i" = "6" ]; then
+                echo "Container failed to start. Logs:"
+                docker logs livetrack --tail 50
+                exit 1
+              fi
+            done
+
+            docker image prune -f

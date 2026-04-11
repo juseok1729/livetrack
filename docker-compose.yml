@@ -1,0 +1,12 @@
+services:
+  livetrack:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: livetrack
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - NODE_ENV=production

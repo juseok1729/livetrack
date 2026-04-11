@@ -1,36 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Livetrack
 
-## Getting Started
+실시간 온라인 강의를 위한 AI 보조 패널 — 챕터 구조 자동 생성, 실시간 Q&A 클러스터링, 수강생 흐름 복구를 하나의 화면에서 제공합니다.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 개요
+
+Zoom·Meet 등 기존 화상 강의는 채팅이 빠르게 밀려 질문이 누락되고, 수강생은 잠깐 집중이 흐트러지면 강의 흐름을 되찾기 어렵습니다. Livetrack은 강의 자료(PDF/PPTX)를 업로드하면 AI가 챕터 구조를 자동 생성하고, 강의 중 수강생에게 실시간 진행 현황을 보여주며, 유사 질문을 AI로 묶어 강의자가 놓치지 않도록 정리합니다.
+
+---
+
+## 기술 스택
+
+| 분류 | 사용 기술 |
+|------|-----------|
+| 프레임워크 | Next.js 16 (App Router) |
+| 언어 | TypeScript |
+| UI | React 19, Tailwind CSS v4 |
+| AI | OpenAI GPT-4o-mini (챕터 분석 · Q&A 그룹핑 · AI 답변) |
+| 파일 파싱 | pdfjs-dist (PDF 렌더링), JSZip + DOMParser (PPTX) |
+| 상태 관리 | React Context + useReducer |
+| 데이터 저장 | localStorage (실시간 탭 간 동기화) |
+
+---
+
+## 주요 기능
+
+### 강의자
+
+#### 강의 준비
+- **PDF / PPTX 업로드** — 드래그 앤 드롭, 파일 형식 및 100MB 크기 검증
+- **AI 챕터 자동 생성** — 슬라이드 내용을 GPT가 분석해 챕터·요약 자동 제안
+- **챕터 편집** — 인라인 이름 수정, 삭제, 드래그 앤 드롭 순서 변경
+- **초대 링크 발급** — 강의 생성 시 랜덤 6자리 코드 자동 발급, 클립보드 복사 토스트
+
+#### 강의 진행
+- **슬라이드 내비게이션** — 이전/다음 버튼 및 키보드 화살표 키
+- **실시간 어노테이션** — 펜·형광펜 필기 도구, 수강생 화면에 실시간 동기화
+- **Q&A 오버레이 패널** — 우측 엣지 호버 또는 `P` 키로 고정/해제
+- **링크 복사** — 강의 중 상단 바에서 즉시 초대 링크 복사
+
+#### Q&A 관리
+- **AI 질문 그룹핑** — 의미적 유사 질문을 GPT가 자동으로 묶어 대표 질문으로 표시
+- **묶인 질문 펼치기** — 그룹 카드 클릭 시 개별 질문 목록 확인
+- **AI 답변 생성** — 챕터 맥락 기반 GPT 답변 초안 자동 생성
+- **인기순 / 최신순 정렬** — 질문이 2개 이상일 때 정렬 토글
+- **답변 완료 처리** — 텍스트 답변 입력 또는 완료만 체크
+- **새 질문 토스트** — 새 질문 수신 시 화면 상단 시각 알림
+
+---
+
+### 수강생
+
+#### 입장 흐름
+- **회원가입 / 로그인** — 이메일·비밀번호 기반 인증, 강의자·수강생 역할 선택
+- **초대 링크 접속** — `/student/join/[코드]` URL로 직접 입장
+- **대기 화면** — 강의 시작 전 대기 화면, 강의 시작 시 자동 전환
+- **종료 화면** — 강의 종료 후 "강의가 종료되었습니다" 안내
+
+#### 강의 수강
+- **실시간 슬라이드** — 강의자 화면이 수강생 화면에 실시간 표시 (localStorage 동기화)
+- **어노테이션 동기화** — 강의자 필기가 수강생 화면에 실시간 오버레이
+- **챕터 현황 패널** — 전체 구조·현재 챕터 강조·진행률 바·경과 시간 표시
+- **챕터 클릭 요약** — 완료·진행 챕터 클릭 시 AI 요약 팝오버 표시
+- **패널 토글** — 패널 접기/펼치기, 상태 localStorage 저장
+- **AI 챕터 전환 요약** — 챕터 전환 시 이전 챕터 핵심 내용 자동 표시
+- **Q&A 질문 등록** — 이름·질문 입력, 좋아요(하트) 기능
+
+---
+
+## 화면 구성
+
+```
+/                          랜딩 페이지
+/auth/login                로그인
+/auth/signup               회원가입
+
+/lecturer                  강의자 대시보드 (강의 목록·생성)
+/lecturer/prepare/[id]     강의 준비 (파일 업로드·챕터 편집)
+/lecturer/live/[id]        강의 진행 (슬라이드·Q&A·어노테이션)
+/lecturer/report/[id]      강의 후 리포트
+
+/student/join/[code]       수강생 입장 및 강의 수강
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 시작하기
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# 의존성 설치
+npm install
 
-## Learn More
+# 환경 변수 설정
+echo "OPENAI_API_KEY=sk-..." > .env.local
 
-To learn more about Next.js, take a look at the following resources:
+# 개발 서버 실행
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+> **참고**: AI 기능(챕터 분석, Q&A 그룹핑, AI 답변)은 OpenAI API 키가 필요합니다.
+> API 키 없이도 파일 업로드·슬라이드 렌더링·Q&A 기본 기능은 동작합니다.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 아키텍처 메모
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **상태 동기화**: 별도 백엔드 없이 `localStorage` + `storage` 이벤트로 강의자↔수강생 탭 간 실시간 동기화
+- **슬라이드 이미지**: 세션 중 메모리 Map (`slide-store.ts`)에 보관, 탭 간 공유는 localStorage JPEG
+- **인증**: localStorage 기반 사용자 목록·현재 세션 저장 — 프로덕션 전환 시 NextAuth 등으로 교체 필요

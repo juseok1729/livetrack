@@ -20,12 +20,12 @@ function SignupForm() {
 
   const redirect = searchParams.get('redirect') ?? ''
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     if (password.length < 6) { setError('비밀번호는 6자 이상이어야 합니다.'); return }
     setSubmitting(true)
-    const result = signup(email.trim(), password, name.trim(), role)
+    const result = await signup(email.trim(), password, name.trim(), role)
     setSubmitting(false)
     if (!result.ok) { setError(result.error ?? ''); return }
     router.push(`/auth/login${redirect ? `?redirect=${encodeURIComponent(redirect)}` : ''}`)

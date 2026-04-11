@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useState, useEffect, useRef } from 'react'
+import { use, useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { MessageSquare, BookOpen, Sparkles, ChevronRight, ChevronLeft } from 'lucide-react'
 import { ChapterPanel } from '@/components/lecture/chapter-panel'
@@ -8,26 +8,30 @@ import { QAPanel } from '@/components/lecture/qa-panel'
 import { AISummaryCard } from '@/components/lecture/ai-summary-card'
 import { StrokeOverlay } from '@/components/lecture/stroke-overlay'
 import { Badge } from '@/components/ui/badge'
-import { useLecture } from '@/contexts/lecture-context'
 import { useAuth } from '@/contexts/auth-context'
-import type { Question } from '@/lib/types'
+import type { Lecture, Question } from '@/lib/types'
 
 type Tab = 'chapters' | 'qa'
 const PANEL_KEY = 'eduflow_panel_open'
+const POLL_INTERVAL = 2500
+
+type StudentLecture = Lecture & { currentSlideImage?: string | null }
 
 export default function StudentJoinPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params)
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
-  const { state, dispatch, lectureQuestions } = useLecture()
 
-  const lecture = state.lectures.find(l => l.code === code.toUpperCase())
+  const [lecture, setLecture] = useState<StudentLecture | null | undefined>(undefined)
+  const [questions, setQuestions] = useState<Question[]>([])
   const [tab, setTab] = useState<Tab>('chapters')
   const [showSummary, setShowSummary] = useState(false)
   const [summaryData, setSummaryData] = useState({ chapter: '', text: '' })
-  const prevChapterIdRef = useRef(lecture?.session?.currentChapterId ?? '')
-  const [liveSlideImage, setLiveSlideImage] = useState<string>('')
+  const prevChapterIdRef = useRef('')
   const [panelOpen, setPanelOpen] = useState(true)
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
+  const likedIdsRef = useRef(likedIds)
+  likedIdsRef.current = likedIds
 
   // Auth guard
   useEffect(() => {
@@ -36,7 +40,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     }
   }, [authLoading, user, router, code])
 
-  // Restore panel state from localStorage
+  // Restore panel state
   useEffect(() => {
     const saved = localStorage.getItem(PANEL_KEY)
     if (saved !== null) setPanelOpen(saved === 'true')
@@ -49,23 +53,31 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     })
   }
 
-  // Read initial slide image
-  useEffect(() => {
-    if (!lecture?.id) return
-    const img = localStorage.getItem(`eduflow-slide-${lecture.id}`)
-    if (img) setLiveSlideImage(img)
-  }, [lecture?.id])
+  // Fetch lecture + questions
+  const fetchLecture = useCallback(async () => {
+    if (!user) return
+    try {
+      const res = await fetch(`/api/lectures/by-code/${code}`)
+      if (!res.ok) { setLecture(null); return }
+      const data = await res.json()
+      if (!data) { setLecture(null); return }
+      setLecture(data)
+      const qRes = await fetch(`/api/lectures/${data.id}/questions`)
+      if (qRes.ok) {
+        const qs: Question[] = await qRes.json()
+        const liked = likedIdsRef.current
+        setQuestions(qs.map(q => ({ ...q, likedByMe: liked.has(q.id) })))
+      }
+    } catch {}
+  }, [user, code])
 
-  // Listen for slide updates
+  // Initial load + polling
   useEffect(() => {
-    if (!lecture?.id) return
-    const key = `eduflow-slide-${lecture.id}`
-    function onStorage(e: StorageEvent) {
-      if (e.key === key && e.newValue) setLiveSlideImage(e.newValue)
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [lecture?.id])
+    if (!user) return
+    fetchLecture()
+    const t = setInterval(fetchLecture, POLL_INTERVAL)
+    return () => clearInterval(t)
+  }, [user, fetchLecture])
 
   // Detect chapter change → show AI summary
   useEffect(() => {
@@ -80,12 +92,21 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
       }
     }
     prevChapterIdRef.current = curr
-  }, [lecture?.session?.currentChapterId, lecture?.chapters])
+  }, [lecture?.session?.currentChapterId, lecture?.chapters, lecture?.session])
 
   if (authLoading || !user) return null
 
-  // Lecture not found
-  if (!lecture) {
+  // Loading
+  if (lecture === undefined) {
+    return (
+      <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full border-2 border-[#865FDF] border-t-transparent animate-spin" />
+      </div>
+    )
+  }
+
+  // Not found
+  if (lecture === null) {
     return (
       <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
         <div className="text-center">
@@ -100,7 +121,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     )
   }
 
-  // Lecture ended
+  // Ended
   if (lecture.status === 'ended') {
     return (
       <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
@@ -116,7 +137,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     )
   }
 
-  // Waiting screen (preparing)
+  // Waiting (preparing)
   if (lecture.status === 'preparing') {
     return (
       <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
@@ -127,18 +148,12 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
               <Sparkles size={32} className="text-[#865FDF]" />
             </div>
           </div>
-          <h2 className="text-xl font-bold text-[#111111] mb-2">
-            안녕하세요, {user.name}님.
-          </h2>
+          <h2 className="text-xl font-bold text-[#111111] mb-2">안녕하세요, {user.name}님.</h2>
           <p className="text-base text-[#555555] mb-1">강의 시작을 기다리고 있어요</p>
           <p className="text-sm text-[#aaaaaa]">{lecture.title}</p>
           <div className="flex items-center justify-center gap-1.5 mt-6">
             {[0, 1, 2].map(i => (
-              <div
-                key={i}
-                className="w-2 h-2 rounded-full bg-[#865FDF]/40 animate-bounce"
-                style={{ animationDelay: `${i * 0.15}s` }}
-              />
+              <div key={i} className="w-2 h-2 rounded-full bg-[#865FDF]/40 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
             ))}
           </div>
         </div>
@@ -149,17 +164,32 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
   // Live view
   const session = lecture.session
   const currentChapter = lecture.chapters.find(c => c.id === session?.currentChapterId)
-  const questions = lectureQuestions(lecture.id)
   const unansweredCount = questions.filter(q => !q.answered).length
+  const liveSlideImage = lecture.currentSlideImage ?? ''
 
-  function handleLike(id: string) {
-    dispatch({ type: 'LIKE_QUESTION', questionId: id })
+  function handleLike(qid: string) {
+    const alreadyLiked = likedIds.has(qid)
+    setLikedIds(prev => {
+      const next = new Set(prev)
+      if (alreadyLiked) next.delete(qid)
+      else next.add(qid)
+      return next
+    })
+    setQuestions(prev => prev.map(q =>
+      q.id === qid ? { ...q, likes: alreadyLiked ? Math.max(0, q.likes - 1) : q.likes + 1, likedByMe: !alreadyLiked } : q
+    ))
+    fetch(`/api/questions/${qid}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: alreadyLiked ? 'unlike' : 'like' }),
+    }).catch(console.error)
   }
 
   function handleSubmitQuestion(content: string, name: string) {
+    if (!lecture) return
     const q: Question = {
       id: `q-student-${Date.now()}`,
-      lectureId: lecture!.id,
+      lectureId: lecture.id,
       chapterId: session?.currentChapterId ?? '',
       studentName: name,
       content,
@@ -167,14 +197,18 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
       answered: false,
       createdAt: new Date().toISOString(),
     }
-    dispatch({ type: 'ADD_QUESTION', question: q })
+    setQuestions(prev => [q, ...prev])
+    fetch(`/api/lectures/${lecture.id}/questions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(q),
+    }).catch(console.error)
   }
 
   return (
     <div className="flex h-screen bg-[#f8f8f8] overflow-hidden">
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 relative">
-        {/* Top bar */}
         <div className="h-14 bg-white border-b border-[#e5e5e5] flex items-center px-6 gap-4 flex-shrink-0">
           <div className="flex items-center gap-2">
             <Badge variant="green">LIVE</Badge>
@@ -187,14 +221,11 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
                 <span>{currentChapter.title}</span>
               </div>
             )}
-            <span className="text-xs text-[#aaaaaa]">
-              {session?.currentSlide}/{lecture.totalSlides} 슬라이드
-            </span>
+            <span className="text-xs text-[#aaaaaa]">{session?.currentSlide}/{lecture.totalSlides} 슬라이드</span>
             <span className="text-xs text-[#aaaaaa] border-l border-[#e5e5e5] pl-3">{user.name}</span>
           </div>
         </div>
 
-        {/* Lecture area */}
         <div className="flex-1 flex items-center justify-center p-8 relative">
           <div className="w-full max-w-4xl aspect-video bg-[#1a1a1a] rounded-2xl border border-[#2a2a2a] relative overflow-hidden shadow-lg">
             {liveSlideImage ? (
@@ -217,7 +248,6 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
               </div>
             )}
           </div>
-
           {showSummary && (
             <div className="absolute bottom-8 left-8 z-20">
               <AISummaryCard chapterTitle={summaryData.chapter} summary={summaryData.text} onClose={() => setShowSummary(false)} />
@@ -226,7 +256,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
         </div>
       </div>
 
-      {/* Toggle button on the edge */}
+      {/* Toggle button */}
       <button
         onClick={togglePanel}
         className="flex-shrink-0 self-center w-6 h-12 flex items-center justify-center bg-white border border-[#e5e5e5] rounded-l-xl text-[#aaaaaa] hover:text-[#865FDF] hover:border-[#865FDF]/40 transition-colors z-10 shadow-sm"
@@ -254,7 +284,6 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
               </button>
             ))}
           </div>
-
           <div className="flex-1 overflow-hidden">
             {tab === 'chapters' ? (
               <ChapterPanel

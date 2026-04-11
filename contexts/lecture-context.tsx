@@ -2,31 +2,6 @@
 
 import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react'
 import type { Lecture, Question, Chapter } from '@/lib/types'
-import { MOCK_LECTURES, MOCK_QUESTIONS } from '@/lib/mock-data'
-
-const STORAGE_KEY = 'eduflow_state_v1'
-
-// Only the parts that need to sync across tabs
-interface PersistedState {
-  lectures: Lecture[]
-  questions: Question[]
-}
-
-function loadFromStorage(): Partial<PersistedState> {
-  if (typeof window === 'undefined') return {}
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : {}
-  } catch {
-    return {}
-  }
-}
-
-function saveToStorage(state: PersistedState) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  } catch {}
-}
 
 interface LectureState {
   lectures: Lecture[]
@@ -35,6 +10,7 @@ interface LectureState {
   showAiSummary: boolean
   aiSummaryText: string
   aiSummaryChapter: string
+  loaded: boolean
 }
 
 type LectureAction =
@@ -47,6 +23,7 @@ type LectureAction =
   | { type: 'UPDATE_TITLE'; lectureId: string; title: string }
   | { type: 'ADD_QUESTION'; question: Question }
   | { type: 'LIKE_QUESTION'; questionId: string }
+  | { type: 'UNLIKE_QUESTION'; questionId: string }
   | { type: 'ANSWER_QUESTION'; questionId: string }
   | { type: 'ANSWER_QUESTION_WITH_TEXT'; questionId: string; answer: string }
   | { type: 'CLEAR_QUESTIONS'; lectureId: string }
@@ -54,24 +31,30 @@ type LectureAction =
   | { type: 'HIDE_SUMMARY' }
   | { type: 'START_LECTURE'; lectureId: string }
   | { type: 'END_LECTURE'; lectureId: string }
-  | { type: '_SYNC'; lectures: Lecture[]; questions: Question[] }
+  | { type: '_SYNC_LECTURES'; lectures: Lecture[] }
+  | { type: '_SYNC_QUESTIONS'; lectureId: string; questions: Question[] }
+  | { type: '_SYNC_LECTURE'; lecture: Lecture }
+  | { type: '_SET_LOADED' }
 
 const initialState: LectureState = {
-  lectures: MOCK_LECTURES,
-  questions: MOCK_QUESTIONS,
+  lectures: [],
+  questions: [],
   currentLectureId: null,
   showAiSummary: false,
   aiSummaryText: '',
   aiSummaryChapter: '',
+  loaded: false,
 }
 
 function reducer(state: LectureState, action: LectureAction): LectureState {
   switch (action.type) {
     case 'SET_CURRENT':
       return { ...state, currentLectureId: action.id }
+    case '_SET_LOADED':
+      return { ...state, loaded: true }
 
     case 'ADD_LECTURE':
-      return { ...state, lectures: [...state.lectures, action.lecture] }
+      return { ...state, lectures: [action.lecture, ...state.lectures] }
 
     case 'UPDATE_TOTAL_SLIDES':
       return {
@@ -138,7 +121,17 @@ function reducer(state: LectureState, action: LectureAction): LectureState {
         ...state,
         questions: state.questions.map(q =>
           q.id === action.questionId
-            ? { ...q, likes: q.likedByMe ? q.likes - 1 : q.likes + 1, likedByMe: !q.likedByMe }
+            ? { ...q, likes: q.likedByMe ? q.likes : q.likes + 1, likedByMe: true }
+            : q
+        ),
+      }
+
+    case 'UNLIKE_QUESTION':
+      return {
+        ...state,
+        questions: state.questions.map(q =>
+          q.id === action.questionId
+            ? { ...q, likes: Math.max(0, q.likedByMe ? q.likes - 1 : q.likes), likedByMe: false }
             : q
         ),
       }
@@ -200,8 +193,23 @@ function reducer(state: LectureState, action: LectureAction): LectureState {
         ),
       }
 
-    case '_SYNC':
-      return { ...state, lectures: action.lectures, questions: action.questions }
+    case '_SYNC_LECTURES':
+      return { ...state, lectures: action.lectures }
+
+    case '_SYNC_QUESTIONS':
+      return {
+        ...state,
+        questions: [
+          ...state.questions.filter(q => q.lectureId !== action.lectureId),
+          ...action.questions,
+        ],
+      }
+
+    case '_SYNC_LECTURE':
+      return {
+        ...state,
+        lectures: state.lectures.map(l => l.id === action.lecture.id ? action.lecture : l),
+      }
 
     default:
       return state
@@ -210,7 +218,7 @@ function reducer(state: LectureState, action: LectureAction): LectureState {
 
 interface LectureContextValue {
   state: LectureState
-  dispatch: React.Dispatch<LectureAction>
+  dispatch: (action: LectureAction) => void
   currentLecture: Lecture | null
   lectureQuestions: (lectureId: string) => Question[]
 }
@@ -218,48 +226,152 @@ interface LectureContextValue {
 const LectureContext = createContext<LectureContextValue | null>(null)
 
 export function LectureProvider({ children }: { children: React.ReactNode }) {
-  // Always start with initialState on server — hydrate from localStorage after mount
-  const [state, dispatch] = useReducer(reducer, initialState)
-  const isExternalUpdate = useRef(false)
-  const hydrated = useRef(false)
+  const [state, dispatchRaw] = useReducer(reducer, initialState)
+  const stateRef = useRef(state)
+  stateRef.current = state
 
-  // Hydrate once on client mount
+  // Load initial lectures (lecturer mode)
   useEffect(() => {
-    if (hydrated.current) return
-    hydrated.current = true
-    const saved = loadFromStorage()
-    if (saved.lectures || saved.questions) {
-      isExternalUpdate.current = true
-      dispatch({
-        type: '_SYNC',
-        lectures: saved.lectures ?? initialState.lectures,
-        questions: saved.questions ?? initialState.questions,
+    fetch('/api/lectures')
+      .then(r => r.ok ? r.json() : [])
+      .then((lectures: Lecture[]) => {
+        dispatchRaw({ type: '_SYNC_LECTURES', lectures })
+        dispatchRaw({ type: '_SET_LOADED' })
       })
-    }
+      .catch(() => dispatchRaw({ type: '_SET_LOADED' }))
   }, [])
 
-  // Persist to localStorage on every state change (client only)
-  useEffect(() => {
-    if (!hydrated.current) return
-    if (isExternalUpdate.current) {
-      isExternalUpdate.current = false
-      return
-    }
-    saveToStorage({ lectures: state.lectures, questions: state.questions })
-  }, [state.lectures, state.questions])
+  // Middleware: dispatch + API sync
+  const dispatch = useCallback((action: LectureAction) => {
+    dispatchRaw(action)
 
-  // Listen for changes from other tabs (student ↔ lecturer sync)
-  useEffect(() => {
-    function onStorage(e: StorageEvent) {
-      if (e.key !== STORAGE_KEY || !e.newValue) return
-      try {
-        const incoming: PersistedState = JSON.parse(e.newValue)
-        isExternalUpdate.current = true
-        dispatch({ type: '_SYNC', lectures: incoming.lectures, questions: incoming.questions } as never)
-      } catch {}
+    // Fire API side effects (don't await — optimistic UI)
+    const apiSync = async () => {
+      switch (action.type) {
+        case 'ADD_LECTURE':
+          await fetch('/api/lectures', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: action.lecture.id, title: action.lecture.title, code: action.lecture.code }),
+          }).catch(console.error)
+          break
+
+        case 'UPDATE_TITLE':
+          await fetch(`/api/lectures/${action.lectureId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: action.title }),
+          }).catch(console.error)
+          break
+
+        case 'UPDATE_TOTAL_SLIDES':
+          await fetch(`/api/lectures/${action.lectureId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ totalSlides: action.totalSlides }),
+          }).catch(console.error)
+          break
+
+        case 'UPDATE_CHAPTERS':
+          await fetch(`/api/lectures/${action.lectureId}/chapters`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chapters: action.chapters }),
+          }).catch(console.error)
+          break
+
+        case 'START_LECTURE': {
+          const lec = stateRef.current.lectures.find(l => l.id === action.lectureId)
+          const startedAt = new Date().toISOString()
+          const firstChapterId = lec?.chapters[0]?.id ?? ''
+          if (lec?.chapters.length) {
+            const updatedChapters = lec.chapters.map((c, i) => ({ ...c, status: i === 0 ? 'active' as const : 'pending' as const }))
+            await fetch(`/api/lectures/${action.lectureId}/chapters`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chapters: updatedChapters }),
+            }).catch(console.error)
+          }
+          await fetch(`/api/lectures/${action.lectureId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'live', startedAt, currentSlide: 1, currentChapterId: firstChapterId }),
+          }).catch(console.error)
+          break
+        }
+
+        case 'END_LECTURE':
+          await fetch(`/api/lectures/${action.lectureId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'ended' }),
+          }).catch(console.error)
+          break
+
+        case 'ADVANCE_SLIDE':
+        case 'PREV_SLIDE': {
+          // stateRef is already updated because we update it synchronously above
+          setTimeout(async () => {
+            const lec = stateRef.current.lectures.find(l => l.id === action.lectureId)
+            if (!lec?.session) return
+            await fetch(`/api/lectures/${action.lectureId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ currentSlide: lec.session.currentSlide, currentChapterId: lec.session.currentChapterId }),
+            }).catch(console.error)
+          }, 0)
+          break
+        }
+
+        case 'ADD_QUESTION':
+          await fetch(`/api/lectures/${action.question.lectureId}/questions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(action.question),
+          }).catch(console.error)
+          break
+
+        case 'LIKE_QUESTION':
+          await fetch(`/api/questions/${action.questionId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'like' }),
+          }).catch(console.error)
+          break
+
+        case 'UNLIKE_QUESTION':
+          await fetch(`/api/questions/${action.questionId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'unlike' }),
+          }).catch(console.error)
+          break
+
+        case 'ANSWER_QUESTION':
+          await fetch(`/api/questions/${action.questionId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'answer' }),
+          }).catch(console.error)
+          break
+
+        case 'ANSWER_QUESTION_WITH_TEXT':
+          await fetch(`/api/questions/${action.questionId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'answer_with_text', answer: action.answer }),
+          }).catch(console.error)
+          break
+
+        case 'CLEAR_QUESTIONS': {
+          await fetch(`/api/lectures/${action.lectureId}/questions`, {
+            method: 'DELETE',
+          }).catch(console.error)
+          break
+        }
+      }
     }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+    apiSync()
   }, [])
 
   const currentLecture = state.lectures.find(l => l.id === state.currentLectureId) ?? null

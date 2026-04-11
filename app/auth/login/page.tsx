@@ -29,18 +29,15 @@ function LoginForm() {
     }
   }, [user, loading, router, redirect])
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setSubmitting(true)
-    const result = login(email.trim(), password)
+    const result = await login(email.trim(), password)
     setSubmitting(false)
     if (!result.ok) { setError(result.error ?? ''); return }
-    const dest = redirect || (result.ok ? '' : '/')
-    // role determined from updated user — read from localStorage
-    const raw = localStorage.getItem('eduflow_current_user')
-    const u = raw ? JSON.parse(raw) : null
-    router.push(dest || (u?.role === 'lecturer' ? '/lecturer' : '/'))
+    const role = result.user?.role
+    router.push(redirect || (role === 'lecturer' ? '/lecturer' : '/'))
   }
 
   if (loading) return null

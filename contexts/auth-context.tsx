@@ -9,65 +9,62 @@ export interface AuthUser {
   role: 'lecturer' | 'student'
 }
 
-interface StoredUser extends AuthUser {
-  password: string
-}
-
 interface AuthContextValue {
   user: AuthUser | null
   loading: boolean
-  login: (email: string, password: string) => { ok: boolean; error?: string }
-  signup: (email: string, password: string, name: string, role: 'lecturer' | 'student') => { ok: boolean; error?: string }
-  logout: () => void
+  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string; user?: AuthUser }>
+  signup: (email: string, password: string, name: string, role: 'lecturer' | 'student') => Promise<{ ok: boolean; error?: string }>
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
-
-const USERS_KEY = 'eduflow_users'
-const CURRENT_KEY = 'eduflow_current_user'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(CURRENT_KEY)
-      if (raw) setUser(JSON.parse(raw))
-    } catch {}
-    setLoading(false)
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(data => { if (data?.id) setUser(data) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
-  const login = useCallback((email: string, password: string): { ok: boolean; error?: string } => {
+  const login = useCallback(async (email: string, password: string): Promise<{ ok: boolean; error?: string; user?: AuthUser }> => {
     try {
-      const users: StoredUser[] = JSON.parse(localStorage.getItem(USERS_KEY) ?? '[]')
-      const found = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password)
-      if (!found) return { ok: false, error: '이메일 또는 비밀번호가 틀렸습니다.' }
-      const { password: _pw, ...authUser } = found
-      setUser(authUser)
-      localStorage.setItem(CURRENT_KEY, JSON.stringify(authUser))
-      return { ok: true }
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      const data = await res.json()
+      if (!res.ok) return { ok: false, error: data.error ?? '오류가 발생했습니다.' }
+      setUser(data)
+      return { ok: true, user: data }
     } catch {
-      return { ok: false, error: '오류가 발생했습니다.' }
+      return { ok: false, error: '네트워크 오류가 발생했습니다.' }
     }
   }, [])
 
-  const signup = useCallback((email: string, password: string, name: string, role: 'lecturer' | 'student'): { ok: boolean; error?: string } => {
+  const signup = useCallback(async (email: string, password: string, name: string, role: 'lecturer' | 'student'): Promise<{ ok: boolean; error?: string }> => {
     try {
-      const users: StoredUser[] = JSON.parse(localStorage.getItem(USERS_KEY) ?? '[]')
-      if (users.some(u => u.email.toLowerCase() === email.toLowerCase()))
-        return { ok: false, error: '이미 사용 중인 이메일입니다.' }
-      const newUser: StoredUser = { id: `user-${Date.now()}`, email, password, name, role }
-      localStorage.setItem(USERS_KEY, JSON.stringify([...users, newUser]))
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name, role }),
+      })
+      const data = await res.json()
+      if (!res.ok) return { ok: false, error: data.error ?? '오류가 발생했습니다.' }
       return { ok: true }
     } catch {
-      return { ok: false, error: '오류가 발생했습니다.' }
+      return { ok: false, error: '네트워크 오류가 발생했습니다.' }
     }
   }, [])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
     setUser(null)
-    localStorage.removeItem(CURRENT_KEY)
   }, [])
 
   return (

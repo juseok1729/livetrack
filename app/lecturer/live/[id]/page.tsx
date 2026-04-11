@@ -66,34 +66,21 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     return () => clearInterval(t)
   }, [lecture?.status])
 
-  // Mock Q&A polling: add a new question every 2min, skip if same content already unanswered
+  // Poll for questions from server every 3s
   useEffect(() => {
-    const names = ['이준서', '박채원', '김하윤', '정도윤', '최수아']
-    const questionBank = [
-      '이 개념을 실제로 어떻게 적용하나요?',
-      '다음 챕터와 어떻게 연결되나요?',
-      '참고할 만한 사례가 있을까요?',
-      '더 자세히 설명해 주실 수 있나요?',
-    ]
-    const t = setInterval(() => {
-      const content = questionBank[Math.floor(Math.random() * questionBank.length)]
-      const existing = lectureQuestions(id)
-      const alreadyPending = existing.some(q => !q.answered && q.content === content)
-      if (alreadyPending) return
-      const q: Question = {
-        id: `q-poll-${Date.now()}`,
-        lectureId: id,
-        chapterId: lecture?.session?.currentChapterId ?? '',
-        studentName: names[Math.floor(Math.random() * names.length)],
-        content,
-        likes: 0,
-        answered: false,
-        createdAt: new Date().toISOString(),
-      }
-      dispatch({ type: 'ADD_QUESTION', question: q })
-    }, 120000)
+    const fetchQuestions = async () => {
+      try {
+        const res = await fetch(`/api/lectures/${id}/questions`)
+        if (res.ok) {
+          const qs: Question[] = await res.json()
+          dispatch({ type: '_SYNC_QUESTIONS', lectureId: id, questions: qs })
+        }
+      } catch {}
+    }
+    fetchQuestions()
+    const t = setInterval(fetchQuestions, 3000)
     return () => clearInterval(t)
-  }, [id, dispatch, lectureQuestions])
+  }, [id, dispatch])
 
   // Keyboard navigation + P to pin/unpin Q&A panel
   useEffect(() => {
@@ -117,7 +104,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     prevChapterIdRef.current = lecture.session.currentChapterId
   }, [lecture?.session?.currentChapterId])
 
-  // Sync current slide image to localStorage so student tabs can display it
+  // Sync current slide image to localStorage (same-browser) and server (cross-browser)
   useEffect(() => {
     if (!currentSlideImage) return
     try {
@@ -125,6 +112,11 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     } catch {
       // ignore QuotaExceededError
     }
+    fetch(`/api/lectures/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentSlideImage }),
+    }).catch(console.error)
   }, [currentSlideImage, id])
 
   // Clear annotation strokes when the slide changes

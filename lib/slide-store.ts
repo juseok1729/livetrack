@@ -39,30 +39,52 @@ export function getSlideRatio(lectureId: string, slideIndex: number): number {
   return ratios?.[slideIndex] ?? 16 / 9
 }
 
-/** Restore from IndexedDB if not in memory. Returns true if slides are now available. */
+/** Restore slides: checks memory → IndexedDB → server API. Returns true if available. */
 export async function restoreSlides(lectureId: string): Promise<boolean> {
   if (store.has(lectureId)) return true
-  if (typeof window === 'undefined' || !window.indexedDB) return false
-  try {
-    const db = await openDb()
-    return new Promise(resolve => {
-      const req = db
-        .transaction(IDB_STORE, 'readonly')
-        .objectStore(IDB_STORE)
-        .get(lectureId)
-      req.onsuccess = () => {
-        const data = req.result as { slides: string[]; ratios: number[] } | undefined
-        if (data?.slides?.length) {
-          store.set(lectureId, data.slides)
-          ratioStore.set(lectureId, data.ratios)
-          resolve(true)
-        } else {
-          resolve(false)
+
+  // L1: IndexedDB (same browser, survives page reload)
+  if (typeof window !== 'undefined' && window.indexedDB) {
+    try {
+      const db = await openDb()
+      const found = await new Promise<boolean>(resolve => {
+        const req = db
+          .transaction(IDB_STORE, 'readonly')
+          .objectStore(IDB_STORE)
+          .get(lectureId)
+        req.onsuccess = () => {
+          const data = req.result as { slides: string[]; ratios: number[] } | undefined
+          if (data?.slides?.length) {
+            store.set(lectureId, data.slides)
+            ratioStore.set(lectureId, data.ratios)
+            resolve(true)
+          } else {
+            resolve(false)
+          }
         }
-      }
-      req.onerror = () => resolve(false)
-    })
-  } catch {
-    return false
+        req.onerror = () => resolve(false)
+      })
+      if (found) return true
+    } catch { /* ignore */ }
   }
+
+  // L2: Server DB (cross-browser, cross-device)
+  try {
+    const res = await fetch(`/api/lectures/${lectureId}/slides`)
+    if (res.ok) {
+      const { images, ratios } = await res.json() as { images: string[]; ratios: number[] }
+      if (images?.length) {
+        store.set(lectureId, images)
+        ratioStore.set(lectureId, ratios)
+        // Warm up IndexedDB cache
+        openDb().then(db => {
+          const tx = db.transaction(IDB_STORE, 'readwrite')
+          tx.objectStore(IDB_STORE).put({ slides: images, ratios }, lectureId)
+        }).catch(() => {})
+        return true
+      }
+    }
+  } catch { /* ignore */ }
+
+  return false
 }

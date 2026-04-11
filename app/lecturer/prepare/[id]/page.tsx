@@ -89,11 +89,21 @@ export default function PreparePage({ params }: { params: Promise<{ id: string }
         pages = result.pages
         setTotalPages(result.pages.length)
         setSlides(id, result.images, result.ratios)
+        fetch(`/api/lectures/${id}/slides`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ images: result.images, ratios: result.ratios }),
+        }).catch(() => {})
       } else {
         const { pages: pdfPages, images, ratios } = await extractPdfPages(file)
         pages = pdfPages
         setTotalPages(pdfPages.length)
         setSlides(id, images, ratios)
+        fetch(`/api/lectures/${id}/slides`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ images, ratios }),
+        }).catch(() => {})
       }
 
       // Always sync totalSlides to the actual page count

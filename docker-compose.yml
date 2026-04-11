@@ -11,10 +11,13 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - NODE_ENV=production
     volumes:
-      - ./data:/app/data
+      - livetrack_data:/app/data
     networks:
       - webservice
 
 networks:
   webservice:
     external: true
+
+volumes:
+  livetrack_data:

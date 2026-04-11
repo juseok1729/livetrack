@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
 export interface AnalyzePdfRequest {
   pages: { pageNumber: number; text: string }[]
   fileName: string
@@ -20,6 +18,7 @@ export interface AnalyzePdfResponse {
 }
 
 export async function POST(req: NextRequest) {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   try {
     const body: AnalyzePdfRequest = await req.json()
     const { pages, fileName } = body

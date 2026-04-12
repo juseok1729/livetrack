@@ -24,7 +24,8 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - NODE_ENV=production
-      - NEXT_PUBLIC_MEDIAMTX_URL=${NEXT_PUBLIC_MEDIAMTX_URL:-/mediamtx}
+      - NEXT_PUBLIC_MEDIAMTX_URL=${NEXT_PUBLIC_MEDIAMTX_URL:-/api/mediamtx}
+      - MEDIAMTX_INTERNAL_URL=http://mediamtx:8889
     volumes:
       - livetrack_data:/app/data
     networks:

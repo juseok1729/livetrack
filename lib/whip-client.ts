@@ -9,17 +9,18 @@ export class WHIPClient {
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
     })
 
+    // Use sendonly transceivers — WHIP requires a=sendonly in SDP
     for (const track of stream.getTracks()) {
-      this.pc.addTrack(track, stream)
+      this.pc.addTransceiver(track, { direction: 'sendonly', streams: [stream] })
     }
 
     const offer = await this.pc.createOffer()
     await this.pc.setLocalDescription(offer)
 
-    // Wait for ICE gathering (max 4s)
+    // Wait for ICE gathering to complete (max 5s)
     await new Promise<void>(resolve => {
       if (this.pc!.iceGatheringState === 'complete') { resolve(); return }
-      const timer = setTimeout(resolve, 4000)
+      const timer = setTimeout(resolve, 5000)
       this.pc!.addEventListener('icegatheringstatechange', () => {
         if (this.pc!.iceGatheringState === 'complete') {
           clearTimeout(timer)
@@ -28,15 +29,22 @@ export class WHIPClient {
       })
     })
 
+    const sdp = this.pc.localDescription?.sdp
+    if (!sdp) throw new Error('SDP not available after ICE gathering')
+
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/sdp' },
-      body: this.pc.localDescription?.sdp,
+      body: sdp,
     })
-    if (!res.ok) throw new Error(`WHIP failed: ${res.status}`)
 
-    const sdp = await res.text()
-    await this.pc.setRemoteDescription({ type: 'answer', sdp })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`WHIP ${res.status}: ${body || res.statusText}`)
+    }
+
+    const answerSdp = await res.text()
+    await this.pc.setRemoteDescription({ type: 'answer', sdp: answerSdp })
   }
 
   stop(): void {

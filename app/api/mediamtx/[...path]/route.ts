@@ -15,16 +15,23 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
 
   const res = await fetch(target, {
     method: req.method,
-    headers: { 'Content-Type': req.headers.get('Content-Type') ?? 'application/sdp' },
+    headers: {
+      'Content-Type': req.headers.get('Content-Type') ?? 'application/sdp',
+      'Accept': req.headers.get('Accept') ?? 'application/sdp',
+    },
     body,
   })
 
   const text = await res.text()
+  if (!res.ok) {
+    console.error(`[mediamtx proxy] ${req.method} ${target} → ${res.status}: ${text}`)
+  }
   return new Response(text, {
     status: res.status,
     headers: {
       'Content-Type': res.headers.get('Content-Type') ?? 'application/sdp',
       'Access-Control-Allow-Origin': '*',
+      'Location': res.headers.get('Location') ?? '',
     },
   })
 }

@@ -4,7 +4,9 @@ services:
     container_name: mediamtx
     restart: unless-stopped
     environment:
-      - MEDIAMTX_EXTERNAL_IP=${MEDIAMTX_EXTERNAL_IP}
+      # If set, advertises the public IP in ICE candidates (needed for cross-network)
+      # Add MEDIAMTX_EXTERNAL_IP=<your_server_public_ip> to .env
+      - MTX_WEBRTCADDITIONALHOSTS=${MEDIAMTX_EXTERNAL_IP:-}
     volumes:
       - ./mediamtx.yml:/mediamtx.yml:ro
     ports:

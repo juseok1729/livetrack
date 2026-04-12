@@ -16,14 +16,12 @@ webrtcAddress: :8889
 webrtcICEServers2:
   - url: stun:stun.l.google.com:19302
 
-# Single UDP/TCP port for ICE (v1.17+ names)
+# Single UDP/TCP port for ICE
 webrtcLocalUDPAddress: :8189
 webrtcLocalTCPAddress: :8189
 
-# Public IP for NAT traversal (v1.17+ name)
-# Set MEDIAMTX_EXTERNAL_IP in .env
-webrtcAdditionalHosts:
-  - ${MEDIAMTX_EXTERNAL_IP}
+# webrtcAdditionalHosts is set via MTX_WEBRTCADDITIONALHOSTS env var
+# in docker-compose so it's only applied when MEDIAMTX_EXTERNAL_IP is set.
 
 paths:
   all_others:

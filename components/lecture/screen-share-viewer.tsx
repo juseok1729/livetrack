@@ -19,6 +19,7 @@ export function ScreenShareViewer({ lectureId, mediamtxUrl, active }: Props) {
       clientRef.current?.stop()
       clientRef.current = null
       if (videoRef.current) videoRef.current.srcObject = null
+      setError('')
       return
     }
 
@@ -26,22 +27,39 @@ export function ScreenShareViewer({ lectureId, mediamtxUrl, active }: Props) {
     setError('')
 
     async function connect() {
-      // Short delay to let MediaMTX register the stream
-      await new Promise(r => setTimeout(r, 800))
-      if (cancelled) return
+      const endpoint = `${mediamtxUrl}/${lectureId}/whep`
+      const MAX_ATTEMPTS = 12
+      const RETRY_DELAY = 2500
 
-      try {
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        if (cancelled) return
+        // First attempt: short delay; subsequent: longer
+        await new Promise(r => setTimeout(r, attempt === 0 ? 1200 : RETRY_DELAY))
+        if (cancelled) return
+
         const client = new WHEPClient()
-        const endpoint = `${mediamtxUrl}/${lectureId}/whep`
-        const stream = await client.start(endpoint)
-        if (cancelled) { client.stop(); return }
-        clientRef.current = client
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          videoRef.current.play().catch(() => {})
+        try {
+          const stream = await client.start(endpoint)
+          if (cancelled) { client.stop(); return }
+          clientRef.current = client
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream
+            videoRef.current.play().catch(() => {})
+          }
+          return // success
+        } catch (e) {
+          client.stop()
+          const msg = e instanceof Error ? e.message : '연결 실패'
+          // Track timeout = ICE failure → no point retrying
+          if (msg.includes('timeout') || msg.includes('Timeout')) {
+            if (!cancelled) setError('ICE 연결 실패 (방화벽/포트 차단)')
+            return
+          }
+          // HTTP error → keep retrying (stream may not be ready yet)
+          if (attempt === MAX_ATTEMPTS - 1 && !cancelled) {
+            setError(`화면공유 연결 실패 (${msg})`)
+          }
         }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : '연결 실패')
       }
     }
 

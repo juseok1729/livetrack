@@ -30,7 +30,10 @@ export class WHEPClient {
       headers: { 'Content-Type': 'application/sdp' },
       body: this.pc.localDescription?.sdp,
     })
-    if (!res.ok) throw new Error(`WHEP failed: ${res.status}`)
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`WHEP ${res.status}${body ? `: ${body.slice(0, 120)}` : ''}`)
+    }
 
     const sdp = await res.text()
     await this.pc.setRemoteDescription({ type: 'answer', sdp })

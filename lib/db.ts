@@ -90,6 +90,7 @@ function initSchema(db: Database.Database) {
   try { db.exec('ALTER TABLE lectures ADD COLUMN current_strokes TEXT') } catch { /* already exists */ }
   try { db.exec('ALTER TABLE lectures ADD COLUMN ended_at TEXT') } catch { /* already exists */ }
   try { db.exec('ALTER TABLE lectures ADD COLUMN peak_students INTEGER NOT NULL DEFAULT 0') } catch { /* already exists */ }
+  try { db.exec('ALTER TABLE lectures ADD COLUMN screen_sharing INTEGER NOT NULL DEFAULT 0') } catch { /* already exists */ }
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_lectures_code ON lectures(join_code);
     CREATE INDEX IF NOT EXISTS idx_lectures_creator ON lectures(created_by);

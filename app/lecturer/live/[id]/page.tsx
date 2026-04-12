@@ -10,6 +10,7 @@ import { ChapterPanel } from '@/components/lecture/chapter-panel'
 import { QAPanel } from '@/components/lecture/qa-panel'
 
 import { SlideAnnotator } from '@/components/lecture/slide-annotator'
+import { ScreenSharePublisher } from '@/components/lecture/screen-share-publisher'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -30,6 +31,8 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   const [linkCopied, setLinkCopied] = useState(false)
   const [slidesReady, setSlidesReady] = useState(() => !!getSlides(id))
   const [studentCount, setStudentCount] = useState(lecture?.studentCount ?? 0)
+  const [screenSharing, setScreenSharing] = useState(false)
+  const mediamtxUrl = process.env.NEXT_PUBLIC_MEDIAMTX_URL ?? '/mediamtx'
 
   // Auth guard
   useEffect(() => {
@@ -286,11 +289,17 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
             <Link2 size={12} />
             {linkCopied ? '복사됨!' : '링크 복사'}
           </button>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <ScreenSharePublisher
+              lectureId={id}
+              mediamtxUrl={mediamtxUrl}
+              onStateChange={setScreenSharing}
+            />
             <button
               onClick={() => setAnnotationOpen(v => !v)}
+              disabled={screenSharing}
               title="펜/형광펜 도구"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 ${
                 annotationOpen
                   ? 'bg-[#865FDF] text-white'
                   : 'border border-[#e5e5e5] text-[#555555] hover:border-[#865FDF] hover:text-[#865FDF]'

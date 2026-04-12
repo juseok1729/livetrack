@@ -36,6 +36,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.currentStrokes !== undefined) { fields.push('current_strokes = ?'); values.push(body.currentStrokes) }
   if (body.status === 'ended') { fields.push('ended_at = ?'); values.push(new Date().toISOString()) }
   if (body.peakStudents !== undefined) { fields.push('peak_students = ?'); values.push(body.peakStudents) }
+  if (body.screenSharing !== undefined) { fields.push('screen_sharing = ?'); values.push(body.screenSharing ? 1 : 0) }
 
   if (fields.length === 0) return NextResponse.json({ error: 'No fields' }, { status: 400 })
   values.push(id)
@@ -50,6 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.currentSlideImage !== undefined) event.currentSlideImage = body.currentSlideImage
   if (body.currentStrokes !== undefined) event.currentStrokes = body.currentStrokes
   if (body.status !== undefined) event.status = body.status
+  if (body.screenSharing !== undefined) event.screenSharing = body.screenSharing
   if (Object.keys(event).length > 0) ssePublish(id, event)
 
   return NextResponse.json(dbLectureToType(updated, dbChaptersToType(id)))

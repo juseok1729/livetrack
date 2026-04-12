@@ -1,4 +1,18 @@
 services:
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: mediamtx
+    restart: unless-stopped
+    environment:
+      - MEDIAMTX_EXTERNAL_IP=${MEDIAMTX_EXTERNAL_IP}
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+    ports:
+      - "8189:8189/udp"   # WebRTC ICE media (UDP) — must be open in firewall
+      - "8189:8189/tcp"   # WebRTC ICE media (TCP fallback)
+    networks:
+      - webservice
+
   livetrack:
     build:
       context: .
@@ -10,6 +24,7 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - NODE_ENV=production
+      - NEXT_PUBLIC_MEDIAMTX_URL=${NEXT_PUBLIC_MEDIAMTX_URL:-/mediamtx}
     volumes:
       - livetrack_data:/app/data
     networks:

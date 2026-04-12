@@ -7,6 +7,7 @@ import { ChapterPanel } from '@/components/lecture/chapter-panel'
 import { QAPanel } from '@/components/lecture/qa-panel'
 import { AISummaryCard } from '@/components/lecture/ai-summary-card'
 import { StrokeOverlay } from '@/components/lecture/stroke-overlay'
+import { ScreenShareViewer } from '@/components/lecture/screen-share-viewer'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/auth-context'
 import type { Lecture, Question } from '@/lib/types'
@@ -31,6 +32,8 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
   const prevChapterIdRef = useRef('')
   const [panelOpen, setPanelOpen] = useState(true)
   const [slideRatio, setSlideRatio] = useState<number>(16 / 9)
+  const [screenSharing, setScreenSharing] = useState(false)
+  const mediamtxUrl = process.env.NEXT_PUBLIC_MEDIAMTX_URL ?? '/mediamtx'
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const likedIdsRef = useRef(likedIds)
   likedIdsRef.current = likedIds
@@ -108,7 +111,8 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
           if (update.status !== undefined) next.status = update.status
           if (update.currentSlideImage !== undefined) next.currentSlideImage = update.currentSlideImage
           if (update.currentStrokes !== undefined) next.currentStrokes = update.currentStrokes
-          if ((update.currentSlide !== undefined || update.currentChapterId !== undefined) && next.session) {
+          if (update.screenSharing !== undefined) setScreenSharing(!!update.screenSharing)
+        if ((update.currentSlide !== undefined || update.currentChapterId !== undefined) && next.session) {
             next.session = {
               ...next.session,
               ...(update.currentSlide !== undefined && { currentSlide: update.currentSlide }),
@@ -303,6 +307,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
               </>
             )}
             <StrokeOverlay lectureId={lecture.id} externalStrokeData={lecture.currentStrokes} />
+            <ScreenShareViewer lectureId={lecture.id} mediamtxUrl={mediamtxUrl} active={screenSharing} />
             {session && (
               <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/60 rounded-lg px-3 py-1.5" style={{ zIndex: 20 }}>
                 <div className="w-1.5 h-1.5 rounded-full bg-[#865FDF]" />

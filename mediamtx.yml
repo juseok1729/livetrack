@@ -1,0 +1,32 @@
+# MediaMTX configuration for LiveTrack screen sharing
+logLevel: info
+logDestinations: [stdout]
+
+# Disable unused protocols
+rtsp: no
+rtmp: no
+hls: no
+srt: no
+
+# WebRTC (WHIP/WHEP)
+webrtc: yes
+webrtcAddress: :8889
+
+# ICE STUN
+webrtcICEServers2:
+  - url: stun:stun.l.google.com:19302
+
+# Single UDP/TCP port for ICE (easier to firewall)
+webrtcICEUDPMuxAddress: :8189
+webrtcICETCPMuxAddress: :8189
+
+# Public IP for NAT traversal — required when behind Docker/NAT.
+# Set MEDIAMTX_EXTERNAL_IP env var in docker-compose or .env
+# e.g. MEDIAMTX_EXTERNAL_IP=1.2.3.4
+webrtcICEHostNAT1To1IPs:
+  - ${MEDIAMTX_EXTERNAL_IP}
+
+# Allow any publisher without auth (auth handled at app layer via lecture ID)
+paths:
+  all_others:
+    source: publisher

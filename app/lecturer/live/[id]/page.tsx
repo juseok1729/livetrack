@@ -32,7 +32,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   const [slidesReady, setSlidesReady] = useState(() => !!getSlides(id))
   const [studentCount, setStudentCount] = useState(lecture?.studentCount ?? 0)
   const [screenSharing, setScreenSharing] = useState(false)
-  const mediamtxUrl = process.env.NEXT_PUBLIC_MEDIAMTX_URL ?? '/mediamtx'
+  const mediamtxUrl = process.env.NEXT_PUBLIC_MEDIAMTX_URL ?? '/api/mediamtx'
 
   // Auth guard
   useEffect(() => {

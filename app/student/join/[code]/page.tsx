@@ -33,7 +33,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
   const [panelOpen, setPanelOpen] = useState(true)
   const [slideRatio, setSlideRatio] = useState<number>(16 / 9)
   const [screenSharing, setScreenSharing] = useState(false)
-  const mediamtxUrl = process.env.NEXT_PUBLIC_MEDIAMTX_URL ?? '/mediamtx'
+  const mediamtxUrl = process.env.NEXT_PUBLIC_MEDIAMTX_URL ?? '/api/mediamtx'
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const likedIdsRef = useRef(likedIds)
   likedIdsRef.current = likedIds

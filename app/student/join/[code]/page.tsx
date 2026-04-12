@@ -278,10 +278,10 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
           <div
             className="bg-[#1a1a1a] rounded-2xl border border-[#2a2a2a] relative overflow-hidden shadow-lg"
             style={{
-              aspectRatio: String(slideRatio),
+              aspectRatio: String(screenSharing ? 16 / 9 : slideRatio),
               maxHeight: 'calc(100vh - 7rem)',
               maxWidth: '100%',
-              width: `min(100%, calc((100vh - 7rem) * ${slideRatio}))`,
+              width: `min(100%, calc((100vh - 7rem) * ${screenSharing ? 16 / 9 : slideRatio}))`,
             }}
           >
             {liveSlideImage ? (

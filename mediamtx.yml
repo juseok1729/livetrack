@@ -20,8 +20,11 @@ webrtcICEServers2:
 webrtcLocalUDPAddress: :8189
 webrtcLocalTCPAddress: :8189
 
-# webrtcAdditionalHosts is set via MTX_WEBRTCADDITIONALHOSTS env var
-# in docker-compose so it's only applied when MEDIAMTX_EXTERNAL_IP is set.
+# Public IP for ICE candidates (required for cross-network WebRTC behind NAT/Docker).
+# Set MTX_WEBRTCADDITIONALHOSTS=<public_ip> in .env — this env var overrides the
+# placeholder below at runtime via MediaMTX's MTX_ prefix mechanism.
+# If env var is not picked up, edit this file directly on the server.
+webrtcAdditionalHosts: []
 
 paths:
   all_others:

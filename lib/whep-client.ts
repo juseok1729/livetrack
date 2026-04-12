@@ -25,6 +25,20 @@ export class WHEPClient {
       })
     })
 
+    // Set up track listener BEFORE setRemoteDescription to avoid race condition:
+    // the 'track' event fires during SDP processing, before the await resolves.
+    const stream = new MediaStream()
+    const trackPromise = new Promise<MediaStream>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Track timeout')), 20000)
+      this.pc!.addEventListener('track', e => {
+        stream.addTrack(e.track)
+        if (stream.getVideoTracks().length > 0) {
+          clearTimeout(timeout)
+          resolve(stream)
+        }
+      })
+    })
+
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/sdp' },
@@ -38,17 +52,7 @@ export class WHEPClient {
     const sdp = await res.text()
     await this.pc.setRemoteDescription({ type: 'answer', sdp })
 
-    return new Promise((resolve, reject) => {
-      const stream = new MediaStream()
-      const timeout = setTimeout(() => reject(new Error('Track timeout')), 10000)
-      this.pc!.addEventListener('track', e => {
-        stream.addTrack(e.track)
-        if (stream.getVideoTracks().length > 0) {
-          clearTimeout(timeout)
-          resolve(stream)
-        }
-      })
-    })
+    return trackPromise
   }
 
   stop(): void {

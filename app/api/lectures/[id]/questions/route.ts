@@ -5,15 +5,11 @@ import { dbQuestionsToType } from '@/lib/lecture-helpers'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const user = await getSession()
-  if (!user) return NextResponse.json([], { status: 401 })
   return NextResponse.json(dbQuestionsToType(id))
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const user = await getSession()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const q = await req.json()
   const db = getDb()
   db.prepare(

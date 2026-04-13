@@ -1,14 +1,10 @@
 import { NextRequest } from 'next/server'
-import { getSession } from '@/lib/session'
 import { sseSubscribe, sseUnsubscribe } from '@/lib/sse-bus'
 
 const encoder = new TextEncoder()
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const user = await getSession()
-  if (!user) return new Response('Unauthorized', { status: 401 })
-
   let ctrl: ReadableStreamDefaultController<Uint8Array>
 
   const stream = new ReadableStream<Uint8Array>({

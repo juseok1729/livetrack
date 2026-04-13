@@ -6,8 +6,6 @@ interface SlideRow { slide_index: number; image: string; ratio: number }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const user = await getSession()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const rows = getDb()
     .prepare('SELECT slide_index, image, ratio FROM lecture_slides WHERE lecture_id = ? ORDER BY slide_index')
     .all(id) as SlideRow[]

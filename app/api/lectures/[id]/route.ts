@@ -56,3 +56,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   return NextResponse.json(dbLectureToType(updated, dbChaptersToType(id)))
 }
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const user = await getSession()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const db = getDb()
+  const lecture = db.prepare('SELECT * FROM lectures WHERE id = ? AND created_by = ?').get(id, user.id)
+  if (!lecture) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  db.prepare('DELETE FROM lectures WHERE id = ?').run(id)
+  return NextResponse.json({ ok: true })
+}

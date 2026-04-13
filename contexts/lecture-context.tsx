@@ -34,6 +34,7 @@ type LectureAction =
   | { type: '_SYNC_LECTURES'; lectures: Lecture[] }
   | { type: '_SYNC_QUESTIONS'; lectureId: string; questions: Question[] }
   | { type: '_SYNC_LECTURE'; lecture: Lecture }
+  | { type: 'REMOVE_LECTURE'; lectureId: string }
   | { type: '_SET_LOADED' }
 
 const initialState: LectureState = {
@@ -55,6 +56,9 @@ function reducer(state: LectureState, action: LectureAction): LectureState {
 
     case 'ADD_LECTURE':
       return { ...state, lectures: [action.lecture, ...state.lectures] }
+
+    case 'REMOVE_LECTURE':
+      return { ...state, lectures: state.lectures.filter(l => l.id !== action.lectureId) }
 
     case 'UPDATE_TOTAL_SLIDES':
       return {
@@ -248,6 +252,10 @@ export function LectureProvider({ children }: { children: React.ReactNode }) {
     // Fire API side effects (don't await — optimistic UI)
     const apiSync = async () => {
       switch (action.type) {
+        case 'REMOVE_LECTURE':
+          await fetch(`/api/lectures/${action.lectureId}`, { method: 'DELETE' }).catch(console.error)
+          break
+
         case 'ADD_LECTURE':
           await fetch('/api/lectures', {
             method: 'POST',

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Play, BookOpen, BarChart3, Users, Clock, ChevronRight, PlusCircle, Link2, LogOut } from 'lucide-react'
+import { Play, BookOpen, BarChart3, Users, Clock, ChevronRight, PlusCircle, Link2, LogOut, Trash2 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/app-layout'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -25,6 +25,7 @@ export default function LecturerDashboard() {
   const { state, dispatch } = useLecture()
   const { lectures } = state
   const [copyToast, setCopyToast] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
   // Auth guard
   useEffect(() => {
@@ -76,6 +77,29 @@ export default function LecturerDashboard() {
       >
         <Link2 size={12} />
         {copied ? '복사됨!' : '링크 복사'}
+      </button>
+    )
+  }
+
+  function DeleteButton({ lec }: { lec: Lecture }) {
+    const confirming = deleteConfirm === lec.id
+    return confirming ? (
+      <div className="flex items-center gap-1">
+        <button
+          onClick={e => { e.preventDefault(); dispatch({ type: 'REMOVE_LECTURE', lectureId: lec.id }); setDeleteConfirm(null) }}
+          className="text-xs px-2.5 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors"
+        >삭제</button>
+        <button
+          onClick={e => { e.preventDefault(); setDeleteConfirm(null) }}
+          className="text-xs px-2.5 py-1.5 rounded-lg border border-[#e5e5e5] text-[#555555] hover:bg-[#f5f5f5] transition-colors"
+        >취소</button>
+      </div>
+    ) : (
+      <button
+        onClick={e => { e.preventDefault(); setDeleteConfirm(lec.id) }}
+        className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-[#e5e5e5] text-[#aaaaaa] hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+      >
+        <Trash2 size={12} />
       </button>
     )
   }
@@ -194,6 +218,7 @@ export default function LecturerDashboard() {
                     {lec.description && <p className="text-xs text-[#555555] mt-1">{lec.description}</p>}
                   </div>
                   <div className="flex items-center gap-2 ml-4">
+                    <DeleteButton lec={lec} />
                     <LinkCopyButton lec={lec} />
                     <Link href={`/lecturer/prepare/${lec.id}`} className="flex items-center gap-1.5 text-sm text-[#865FDF] hover:text-[#7450cc] font-medium px-3 py-2 rounded-lg hover:bg-[#f0ebff] transition-colors">
                       <BookOpen size={14} /> 편집
@@ -222,9 +247,12 @@ export default function LecturerDashboard() {
                     </div>
                     <h3 className="font-semibold text-[#111111]">{lec.title}</h3>
                   </div>
-                  <Link href={`/lecturer/report/${lec.id}`} className="flex items-center gap-1.5 text-sm text-[#555555] hover:text-[#865FDF] font-medium px-3 py-2 rounded-lg hover:bg-[#f0ebff] transition-colors ml-4">
-                    <BarChart3 size={14} /> 리포트 보기
-                  </Link>
+                  <div className="flex items-center gap-2 ml-4">
+                    <DeleteButton lec={lec} />
+                    <Link href={`/lecturer/report/${lec.id}`} className="flex items-center gap-1.5 text-sm text-[#555555] hover:text-[#865FDF] font-medium px-3 py-2 rounded-lg hover:bg-[#f0ebff] transition-colors">
+                      <BarChart3 size={14} /> 리포트 보기
+                    </Link>
+                  </div>
                 </div>
               </Card>
             ))}

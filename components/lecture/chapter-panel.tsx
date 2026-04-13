@@ -71,7 +71,7 @@ export function ChapterPanel({ chapters, currentChapterId, currentSlide, totalSl
           const isActive = ch.id === currentChapterId
           const isDone = ch.status === 'completed'
           const isExpanded = expandedId === ch.id
-          const clickable = mode === 'student' && (isActive || isDone)
+          const clickable = mode === 'student'
 
           return (
             <div key={ch.id} className="mb-1">

@@ -262,13 +262,15 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
 
         {/* End lecture */}
         <div className="mt-auto px-4 py-4">
-          <Link
-            href={`/lecturer/report/${id}`}
-            onClick={() => dispatch({ type: 'END_LECTURE', lectureId: id })}
+          <button
+            onClick={() => {
+              dispatch({ type: 'END_LECTURE', lectureId: id })
+              router.push('/lecturer')
+            }}
             className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border border-[#ef4444]/30 text-[#ef4444] hover:bg-[#ef4444]/10 text-sm transition-colors"
           >
             <StopCircle size={15} /> 강의 종료
-          </Link>
+          </button>
         </div>
       </div>
 

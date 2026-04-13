@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Play, BarChart3, ChevronRight, Link2, Trash2 } from 'lucide-react'
+import { Play, BookOpen, BarChart3, ChevronRight, Link2, Trash2 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/app-layout'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'

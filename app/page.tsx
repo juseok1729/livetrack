@@ -21,7 +21,7 @@ function generateCode(): string {
 
 export default function HomePage() {
   const router = useRouter()
-  const { user, logout } = useAuth()
+  const { user, logout, login } = useAuth()
   const { dispatch } = useLecture()
 
   function handleCreateLecture() {
@@ -68,13 +68,13 @@ export default function HomePage() {
               </div>
             </>
           ) : (
-            <Link
-              href="/auth/login"
+            <button
+              onClick={async () => { await login('admin@livetrack.com', 'kkkkkk') }}
               className="flex items-center gap-1.5 text-sm text-white bg-[#865FDF] hover:bg-[#7450cc] px-4 py-2 rounded-lg transition-colors font-medium"
             >
               <LogIn size={14} />
               로그인
-            </Link>
+            </button>
           )}
         </div>
       </nav>

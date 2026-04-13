@@ -202,9 +202,9 @@ export default function HomePage() {
           수업에만 집중하세요
         </h1>
 
-        <p className="text-white/60 text-base max-w-lg leading-relaxed mb-10">
-          자료만 올리면, AI가 강의의 흐름에 맞춰 챕터를 구성하고 실시간 질답을 정리합니다.<br />
-          번거로운 운영은 맡기고, 수강생과의 연결에 집중하세요.
+        <p className="text-white/60 text-base leading-relaxed mb-10">
+          <span className="block">자료만 올리면, AI가 강의의 흐름에 맞춰 챕터를 구성하고 실시간 질답을 정리합니다.</span>
+          <span className="block">번거로운 운영은 맡기고, 수강생과의 연결에 집중하세요.</span>
         </p>
 
         <div className="flex items-center gap-4 mb-16">

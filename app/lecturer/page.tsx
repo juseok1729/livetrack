@@ -200,7 +200,6 @@ export default function LecturerDashboard() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge variant="gray">{statusLabel[lec.status]}</Badge>
-                      <span className="text-xs text-[#aaaaaa]">수강생 {lec.studentCount}명</span>
                     </div>
                     <h3 className="font-semibold text-[#111111]">{lec.title}</h3>
                   </div>

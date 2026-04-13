@@ -8,22 +8,31 @@ interface BarChartProps {
   unit?: string
 }
 
+const BAR_AREA_H = 120
+
 export function BarChart({ data, unit = '분' }: BarChartProps) {
   const max = Math.max(...data.map(d => d.value), 1)
   return (
-    <div className="flex items-end gap-4 h-40 px-2">
-      {data.map((d, i) => (
-        <div key={i} className="flex-1 flex flex-col items-center gap-2">
-          <span className="text-xs font-semibold text-[#555555]">{d.value}{unit}</span>
-          <div className="w-full rounded-t-lg overflow-hidden" style={{ height: `${(d.value / max) * 100}%` }}>
-            <div
-              className="w-full h-full rounded-t-lg transition-all duration-700"
-              style={{ background: d.color ?? '#865FDF', opacity: 0.85 + i * 0.05 }}
-            />
+    <div className="flex gap-4 px-2">
+      {data.map((d, i) => {
+        const barH = Math.max(4, Math.round((d.value / max) * BAR_AREA_H))
+        return (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
+            <span className="text-xs font-semibold text-[#555555]">{d.value}{unit}</span>
+            <div className="w-full flex items-end" style={{ height: BAR_AREA_H }}>
+              <div
+                className="w-full rounded-t-lg transition-all duration-700"
+                style={{
+                  height: barH,
+                  background: d.color ?? '#865FDF',
+                  opacity: 0.6 + (i / Math.max(data.length - 1, 1)) * 0.4,
+                }}
+              />
+            </div>
+            <span className="text-[10px] text-[#aaaaaa] text-center leading-tight">{d.label}</span>
           </div>
-          <span className="text-[10px] text-[#aaaaaa] text-center leading-tight">{d.label}</span>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

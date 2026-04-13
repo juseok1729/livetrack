@@ -527,6 +527,16 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
             )}
             <StrokeOverlay lectureId={lecture.id} externalStrokeData={lecture.currentStrokes} />
             <ScreenShareViewer lectureId={lecture.id} mediamtxUrl={mediamtxUrl} active={screenSharing} />
+            {/* Self-view PiP — local camera stream, no WHIP needed */}
+            {activeStream && (
+              <div className="absolute bottom-4 right-4 z-30 w-28 aspect-video rounded-xl overflow-hidden shadow-lg border-2 border-white/20 bg-black">
+                <video
+                  ref={el => { if (el && activeStream) { el.srcObject = activeStream; el.play().catch(() => {}) } }}
+                  autoPlay muted playsInline
+                  className="w-full h-full object-cover scale-x-[-1]"
+                />
+              </div>
+            )}
             {session && (
               <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/60 rounded-lg px-3 py-1.5" style={{ zIndex: 20 }}>
                 <div className="w-1.5 h-1.5 rounded-full bg-[#865FDF]" />

@@ -23,18 +23,21 @@ export function StudentCamPublisher({ lectureId, nickname, stream, mediamtxUrl }
     let mounted = true
 
     async function publish() {
+      // Register camera immediately so lecturer user list shows camera on
+      await fetch(`/api/lectures/${lectureId}/cameras`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname, streamPath }),
+      }).catch(() => {})
+
+      // Then attempt WHIP publish for video streaming
       const client = new WHIPClient()
       try {
         await client.start(stream, endpoint)
         if (!mounted) { client.stop(); return }
         clientRef.current = client
-        await fetch(`/api/lectures/${lectureId}/cameras`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nickname, streamPath }),
-        })
       } catch (e) {
-        console.warn('Student camera publish failed:', e)
+        console.warn('Student camera WHIP publish failed:', e)
       }
     }
 

@@ -11,6 +11,7 @@ import { QAPanel } from '@/components/lecture/qa-panel'
 
 import { SlideAnnotator } from '@/components/lecture/slide-annotator'
 import { ScreenSharePublisher } from '@/components/lecture/screen-share-publisher'
+import { ScreenShareViewer } from '@/components/lecture/screen-share-viewer'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -32,6 +33,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   const [slidesReady, setSlidesReady] = useState(() => !!getSlides(id))
   const [studentCount, setStudentCount] = useState(lecture?.studentCount ?? 0)
   const [screenSharing, setScreenSharing] = useState(false)
+  const [viewMode, setViewMode] = useState<'slide' | 'screenshare'>('slide')
   const mediamtxUrl = process.env.NEXT_PUBLIC_MEDIAMTX_URL ?? '/api/mediamtx'
 
   // Auth guard
@@ -294,7 +296,11 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
             <ScreenSharePublisher
               lectureId={id}
               mediamtxUrl={mediamtxUrl}
-              onStateChange={setScreenSharing}
+              onStateChange={sharing => {
+                setScreenSharing(sharing)
+                if (sharing) setViewMode('screenshare')
+                else setViewMode('slide')
+              }}
             />
             <button
               onClick={() => setAnnotationOpen(v => !v)}
@@ -349,7 +355,30 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
             {annotationOpen && (
               <SlideAnnotator onClose={() => setAnnotationOpen(false)} lectureId={id} />
             )}
+            {/* Screen share overlay (lecturer preview) */}
+            {screenSharing && viewMode === 'screenshare' && (
+              <ScreenShareViewer lectureId={id} mediamtxUrl={mediamtxUrl} active={true} />
+            )}
           </div>
+
+          {/* View toggle — only when screen sharing */}
+          {screenSharing && (
+            <div className="flex gap-3 mt-4">
+              {(['slide', 'screenshare'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`flex-1 max-w-[180px] py-3 rounded-xl text-sm font-semibold border-2 transition-colors
+                    ${viewMode === mode
+                      ? 'border-[#865FDF] text-[#865FDF] bg-[#f0ebff]'
+                      : 'border-[#e5e5e5] text-[#aaaaaa] hover:border-[#865FDF]/40 hover:text-[#555555]'
+                    }`}
+                >
+                  {mode === 'slide' ? '슬라이드' : '화면공유'}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
       </div>

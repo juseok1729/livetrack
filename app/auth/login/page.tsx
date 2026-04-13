@@ -23,7 +23,7 @@ function LoginForm() {
       const needsLecturer = redirect.startsWith('/lecturer')
       // Only auto-redirect if the user already has the right role for the destination
       if (!needsLecturer || user.role === 'lecturer') {
-        router.replace(redirect || (user.role === 'lecturer' ? '/lecturer' : '/'))
+        router.replace(redirect || '/')
       }
       // Otherwise fall through and show the form so they can log in with the correct account
     }
@@ -37,7 +37,7 @@ function LoginForm() {
     setSubmitting(false)
     if (!result.ok) { setError(result.error ?? ''); return }
     const role = result.user?.role
-    router.push(redirect || (role === 'lecturer' ? '/lecturer' : '/'))
+    router.push(redirect || '/')
   }
 
   if (loading) return null

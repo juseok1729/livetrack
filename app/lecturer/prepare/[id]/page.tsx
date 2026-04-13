@@ -2,7 +2,7 @@
 
 import { use, useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles, Play, ArrowLeft, Pencil, Check, X, FileText, RefreshCw } from 'lucide-react'
+import { Sparkles, Play, ArrowLeft, Pencil, Check, X, FileText, FolderOpen } from 'lucide-react'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/app-layout'
 import { ChapterEditor } from '@/components/lecture/chapter-editor'
@@ -45,6 +45,7 @@ export default function PreparePage({ params }: { params: Promise<{ id: string }
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState(lecture?.title ?? '')
   const titleInputRef = useRef<HTMLInputElement>(null)
+  const changeFileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (lecture) {
@@ -256,11 +257,22 @@ export default function PreparePage({ params }: { params: Promise<{ id: string }
                   <p className="text-xs text-[#aaaaaa] mt-0.5">{totalPages}장 슬라이드</p>
                 </div>
                 <button
-                  onClick={() => { setFileName(''); setSlideImages([]); setAiDone(false) }}
+                  onClick={() => changeFileRef.current?.click()}
                   className="flex items-center gap-1.5 text-xs text-[#888888] hover:text-[#865FDF] px-2.5 py-1.5 rounded-lg hover:bg-[#f0ebff] transition-colors flex-shrink-0"
                 >
-                  <RefreshCw size={12} /> 다시 업로드
+                  <FolderOpen size={13} /> 파일 변경
                 </button>
+                <input
+                  ref={changeFileRef}
+                  type="file"
+                  accept=".pdf,.pptx"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0]
+                    if (file) handleFileSelected(file)
+                    e.target.value = ''
+                  }}
+                />
               </div>
             ) : (
               <FileUploadZone onFileSelected={handleFileSelected} disabled={aiLoading} />

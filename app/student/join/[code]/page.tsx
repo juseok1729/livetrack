@@ -2,7 +2,7 @@
 
 import { use, useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { MessageSquare, BookOpen, Sparkles, ChevronRight, ChevronLeft, GraduationCap, ArrowRight, Monitor, GalleryHorizontalEnd, LogOut, Video, VideoOff, Users } from 'lucide-react'
+import { MessageSquare, BookOpen, Sparkles, ChevronRight, ChevronLeft, GraduationCap, ArrowRight, Monitor, GalleryHorizontalEnd, LogOut, Video, VideoOff, CameraOff, Users } from 'lucide-react'
 import { ChapterPanel } from '@/components/lecture/chapter-panel'
 import { QAPanel } from '@/components/lecture/qa-panel'
 import { AISummaryCard } from '@/components/lecture/ai-summary-card'
@@ -322,10 +322,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
                   />
                 ) : (
                   <div className="flex flex-col items-center gap-2">
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#bbbbbb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M3 3l18 18M11 11a3 3 0 004.243 4.243M6.757 6.757A3 3 0 0012 12" />
-                      <path d="M9 3h6l2 2h3a1 1 0 011 1v11M3 8a1 1 0 011-1h1" />
-                    </svg>
+                    <CameraOff size={40} className="text-[#bbbbbb]" />
                   </div>
                 )}
               </div>
@@ -507,7 +504,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
   }
 
   return (
-    <div className="flex h-screen bg-[#f8f8f8] overflow-hidden">
+    <div className="flex flex-col h-screen bg-[#f8f8f8] overflow-hidden">
       {/* Camera publisher (invisible) */}
       {activeStream && nickname && (
         <StudentCamPublisher
@@ -517,62 +514,64 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
           mediamtxUrl={mediamtxUrl}
         />
       )}
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0 relative">
-        <div className="h-14 bg-white border-b border-[#e5e5e5] flex items-center px-6 gap-4 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <Badge variant="green">LIVE</Badge>
-            <span className="text-sm font-semibold text-[#111111]">{lecture.title}</span>
-          </div>
-          <div className="ml-auto flex items-center gap-3">
-            {currentChapter && (
-              <div className="flex items-center gap-1.5 text-xs text-[#555555] bg-[#f3f3f3] px-3 py-1.5 rounded-lg">
-                <BookOpen size={12} className="text-[#865FDF]" />
-                <span>{currentChapter.title}</span>
-              </div>
-            )}
-            <span className="text-xs text-[#aaaaaa]">{session?.currentSlide}/{lecture.totalSlides} 슬라이드</span>
-            {/* Camera toggle */}
-            <button
-              onClick={toggleLiveCam}
-              title={activeStream ? '캠 끄기' : '캠 켜기'}
-              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors
-                ${activeStream
-                  ? 'border-[#865FDF] text-[#865FDF] bg-[#f0ebff]'
-                  : 'border-[#e5e5e5] text-[#aaaaaa] hover:border-[#865FDF] hover:text-[#865FDF]'
-                }`}
-            >
-              {activeStream ? <Video size={13} /> : <VideoOff size={13} />}
-              {activeStream ? '캠 ON' : '캠 OFF'}
-            </button>
-            <span className="text-xs text-[#aaaaaa] border-l border-[#e5e5e5] pl-3">{nickname}</span>
-            <button
-              onClick={() => {
-                activeStream?.getTracks().forEach(t => t.stop())
-                if (lecture?.id) {
-                  fetch(`/api/lectures/${lecture.id}/presence`, {
+      {/* Header — full width */}
+      <div className="h-14 bg-white border-b border-[#e5e5e5] flex items-center px-6 gap-4 flex-shrink-0">
+        <div className="flex items-center gap-2 min-w-0 shrink">
+          <Badge variant="green">LIVE</Badge>
+          <span className="text-sm font-semibold text-[#111111] truncate">{lecture.title}</span>
+        </div>
+        <div className="ml-auto flex items-center gap-3">
+          {currentChapter && (
+            <div className="flex items-center gap-1.5 text-xs text-[#555555] bg-[#f3f3f3] px-3 py-1.5 rounded-lg">
+              <BookOpen size={12} className="text-[#865FDF]" />
+              <span>{currentChapter.title}</span>
+            </div>
+          )}
+          <span className="text-xs text-[#aaaaaa]">{session?.currentSlide}/{lecture.totalSlides} 슬라이드</span>
+          {/* Camera toggle */}
+          <button
+            onClick={toggleLiveCam}
+            title={activeStream ? '캠 끄기' : '캠 켜기'}
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors
+              ${activeStream
+                ? 'border-[#865FDF] text-[#865FDF] bg-[#f0ebff]'
+                : 'border-[#e5e5e5] text-[#aaaaaa] hover:border-[#865FDF] hover:text-[#865FDF]'
+              }`}
+          >
+            {activeStream ? <Video size={13} /> : <VideoOff size={13} />}
+            {activeStream ? '캠 ON' : '캠 OFF'}
+          </button>
+          <span className="text-xs text-[#aaaaaa] border-l border-[#e5e5e5] pl-3">{nickname}</span>
+          <button
+            onClick={() => {
+              activeStream?.getTracks().forEach(t => t.stop())
+              if (lecture?.id) {
+                fetch(`/api/lectures/${lecture.id}/presence`, {
+                  method: 'DELETE',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ nickname }),
+                }).catch(() => {})
+                if (activeStream) {
+                  fetch(`/api/lectures/${lecture.id}/cameras`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ nickname }),
                   }).catch(() => {})
-                  if (activeStream) {
-                    fetch(`/api/lectures/${lecture.id}/cameras`, {
-                      method: 'DELETE',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ nickname }),
-                    }).catch(() => {})
-                  }
                 }
-                router.push('/')
-              }}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg text-[#ef4444] border border-[#ef4444]/30 hover:bg-[#ef4444]/10 transition-colors"
-            >
-              <LogOut size={13} />
-              나가기
-            </button>
-          </div>
+              }
+              router.push('/')
+            }}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg text-[#ef4444] border border-[#ef4444]/30 hover:bg-[#ef4444]/10 transition-colors"
+          >
+            <LogOut size={13} />
+            나가기
+          </button>
         </div>
-
+      </div>
+      {/* Content row */}
+      <div className="flex flex-1 min-h-0">
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0 relative">
         <div className="flex-1 flex flex-col items-center justify-center p-8 gap-3 relative">
           <div
             className="bg-[#1a1a1a] rounded-2xl border border-[#2a2a2a] relative overflow-hidden shadow-lg"
@@ -726,6 +725,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
           </div>
         </div>
       )}
+      </div>{/* end content row */}
     </div>
   )
 }

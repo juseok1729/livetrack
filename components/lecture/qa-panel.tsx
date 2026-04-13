@@ -445,20 +445,27 @@ function GroupCard({ group: g, onLike, onAnswer, onAnswerSingle }: {
 function UsersTab({ questions, lectureId }: { questions: Question[]; lectureId?: string }) {
   const mediamtxUrl = process.env.NEXT_PUBLIC_MEDIAMTX_URL ?? '/api/mediamtx'
   const [activeCameras, setActiveCameras] = useState<string[]>([])
+  const [participants, setParticipants] = useState<string[]>([])
 
   useEffect(() => {
     if (!lectureId) return
-    const fetch_ = () =>
+    const poll = () => Promise.all([
       fetch(`/api/lectures/${lectureId}/cameras`)
         .then(r => r.ok ? r.json() : null)
         .then(d => { if (d?.cameras) setActiveCameras(d.cameras.map((c: { nickname: string }) => c.nickname)) })
-        .catch(() => {})
-    fetch_()
-    const t = setInterval(fetch_, 3000)
+        .catch(() => {}),
+      fetch(`/api/lectures/${lectureId}/presence`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.participants) setParticipants(d.participants) })
+        .catch(() => {}),
+    ])
+    poll()
+    const t = setInterval(poll, 3000)
     return () => clearInterval(t)
   }, [lectureId])
 
-  const users = [...new Set(questions.map(q => q.studentName))].sort()
+  // Merge presence list with question authors (union) so historical senders also show
+  const users = [...new Set([...participants, ...questions.map(q => q.studentName)])].sort()
 
   return (
     <div className="flex-1 overflow-y-auto px-3 py-3">

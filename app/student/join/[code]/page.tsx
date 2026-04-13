@@ -157,6 +157,34 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     return () => clearInterval(t)
   }, [nickname, lecture?.id, fetchQuestions])
 
+  // Presence registration
+  useEffect(() => {
+    if (!nickname || !lecture?.id) return
+    const lectureId = lecture.id
+    fetch(`/api/lectures/${lectureId}/presence`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nickname }),
+    }).catch(() => {})
+    const unregister = () => {
+      fetch(`/api/lectures/${lectureId}/presence`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname }),
+        keepalive: true,
+      }).catch(() => {})
+    }
+    window.addEventListener('beforeunload', unregister)
+    return () => {
+      window.removeEventListener('beforeunload', unregister)
+      fetch(`/api/lectures/${lectureId}/presence`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname }),
+      }).catch(() => {})
+    }
+  }, [nickname, lecture?.id])
+
   // SSE
   useEffect(() => {
     if (!nickname || !lecture?.id) return

@@ -2,7 +2,7 @@
 
 import { use, useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles, Play, ArrowLeft, Pencil, Check, X } from 'lucide-react'
+import { Sparkles, Play, ArrowLeft, Pencil, Check, X, FileText, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/app-layout'
 import { ChapterEditor } from '@/components/lecture/chapter-editor'
@@ -39,6 +39,7 @@ export default function PreparePage({ params }: { params: Promise<{ id: string }
   const [fileName, setFileName] = useState('')
   const [totalPages, setTotalPages] = useState(0)
   const [suggestedTitle, setSuggestedTitle] = useState('')
+  const [slideImages, setSlideImages] = useState<string[]>([])
 
   // Title inline edit state
   const [editingTitle, setEditingTitle] = useState(false)
@@ -88,6 +89,7 @@ export default function PreparePage({ params }: { params: Promise<{ id: string }
         const result = await renderPptxSlides(file)
         pages = result.pages
         setTotalPages(result.pages.length)
+        setSlideImages(result.images)
         setSlides(id, result.images, result.ratios)
         fetch(`/api/lectures/${id}/slides`, {
           method: 'POST',
@@ -98,6 +100,7 @@ export default function PreparePage({ params }: { params: Promise<{ id: string }
         const { pages: pdfPages, images, ratios } = await extractPdfPages(file)
         pages = pdfPages
         setTotalPages(pdfPages.length)
+        setSlideImages(images)
         setSlides(id, images, ratios)
         fetch(`/api/lectures/${id}/slides`, {
           method: 'POST',
@@ -243,7 +246,25 @@ export default function PreparePage({ params }: { params: Promise<{ id: string }
           <div className="bg-white border border-[#e5e5e5] rounded-2xl p-5">
             <h2 className="text-sm font-semibold text-[#111111] mb-1">강의 자료 업로드</h2>
             <p className="text-xs text-[#555555] mb-4">PPT 또는 PDF를 업로드하면 AI가 챕터를 자동으로 제안합니다</p>
-            <FileUploadZone onFileSelected={handleFileSelected} disabled={aiLoading} />
+            {fileName && !aiLoading ? (
+              <div className="flex items-center gap-3 p-4 bg-[#f8f8f8] border border-[#e5e5e5] rounded-xl">
+                <div className="w-10 h-10 rounded-lg bg-[#f0ebff] flex items-center justify-center flex-shrink-0">
+                  <FileText size={18} className="text-[#865FDF]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[#111111] truncate">{fileName}</p>
+                  <p className="text-xs text-[#aaaaaa] mt-0.5">{totalPages}장 슬라이드</p>
+                </div>
+                <button
+                  onClick={() => { setFileName(''); setSlideImages([]); setAiDone(false) }}
+                  className="flex items-center gap-1.5 text-xs text-[#888888] hover:text-[#865FDF] px-2.5 py-1.5 rounded-lg hover:bg-[#f0ebff] transition-colors flex-shrink-0"
+                >
+                  <RefreshCw size={12} /> 다시 업로드
+                </button>
+              </div>
+            ) : (
+              <FileUploadZone onFileSelected={handleFileSelected} disabled={aiLoading} />
+            )}
           </div>
 
           {/* AI Status */}
@@ -323,7 +344,7 @@ export default function PreparePage({ params }: { params: Promise<{ id: string }
                 </div>
               </div>
             ) : (
-              <ChapterEditor chapters={chapters} onChange={setChapters} />
+              <ChapterEditor chapters={chapters} onChange={setChapters} slides={slideImages} />
             )}
           </div>
         </div>

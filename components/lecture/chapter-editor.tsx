@@ -8,9 +8,10 @@ import { Button } from '@/components/ui/button'
 interface ChapterEditorProps {
   chapters: Chapter[]
   onChange: (chapters: Chapter[]) => void
+  slides?: string[]
 }
 
-export function ChapterEditor({ chapters, onChange }: ChapterEditorProps) {
+export function ChapterEditor({ chapters, onChange, slides }: ChapterEditorProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [dragOver, setDragOver] = useState<string | null>(null)
@@ -145,6 +146,34 @@ export function ChapterEditor({ chapters, onChange }: ChapterEditorProps) {
               </div>
             )}
           </div>
+
+          {/* Slide thumbnails */}
+          {slides && slides.length > 0 && editingId !== ch.id && (() => {
+            const start = ch.slideRange[0] - 1
+            const end = Math.min(ch.slideRange[1] - 1, slides.length - 1)
+            const thumbs = []
+            for (let i = start; i <= end; i++) thumbs.push(i)
+            const visible = thumbs.slice(0, 4)
+            const overflow = thumbs.length - visible.length
+            return (
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {visible.map(i => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={i}
+                    src={slides[i]}
+                    alt={`슬라이드 ${i + 1}`}
+                    className="w-10 h-7 object-cover rounded border border-[#e5e5e5] flex-shrink-0"
+                  />
+                ))}
+                {overflow > 0 && (
+                  <div className="w-10 h-7 rounded border border-[#e5e5e5] bg-[#f3f3f3] flex items-center justify-center flex-shrink-0">
+                    <span className="text-[10px] text-[#aaaaaa] font-medium">+{overflow}</span>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* Actions */}
           {editingId !== ch.id && (

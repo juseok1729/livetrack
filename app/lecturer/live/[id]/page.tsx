@@ -50,6 +50,11 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   }
   const prevChapterIdRef = useRef(lecture?.session?.currentChapterId ?? '')
   const [annotationOpen, setAnnotationOpen] = useState(false)
+  const [qaOpen, setQaOpen] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const saved = localStorage.getItem('livetrack_qa_panel')
+    return saved !== 'false'
+  })
 
   interface QAToast { id: string; content: string; name: string }
   const [toasts, setToasts] = useState<QAToast[]>([])
@@ -349,8 +354,21 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
 
       </div>
 
-      {/* Right panel — permanent Q&A sidebar */}
-      <div className="w-[320px] flex-shrink-0 bg-white border-l border-[#e5e5e5] flex flex-col">
+      {/* Toggle button */}
+      <button
+        onClick={() => setQaOpen(v => {
+          const next = !v
+          localStorage.setItem('livetrack_qa_panel', String(next))
+          return next
+        })}
+        className="flex-shrink-0 self-center w-5 h-12 flex items-center justify-center bg-white border-y border-l border-[#e5e5e5] rounded-l-lg text-[#aaaaaa] hover:text-[#865FDF] hover:border-[#865FDF]/40 transition-colors z-10"
+        title={qaOpen ? '패널 닫기' : '패널 열기'}
+      >
+        {qaOpen ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+      </button>
+
+      {/* Right panel — collapsible Q&A sidebar */}
+      {qaOpen && <div className="w-[320px] flex-shrink-0 bg-white border-l border-[#e5e5e5] flex flex-col">
         <QAPanel
           questions={questions}
           mode="lecturer"
@@ -380,10 +398,13 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
             })
           }}
         />
-      </div>
+      </div>}
 
       {/* Toast notifications */}
-      <div className="absolute top-16 right-[328px] z-50 flex flex-col gap-2 pointer-events-none" style={{ maxWidth: '280px' }}>
+      <div
+        className="absolute top-16 z-50 flex flex-col gap-2 pointer-events-none"
+        style={{ maxWidth: '280px', right: qaOpen ? '328px' : '8px' }}
+      >
         {toasts.map(t => (
           <div
             key={t.id}

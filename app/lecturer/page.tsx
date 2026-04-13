@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Play, BookOpen, BarChart3, ChevronRight, Link2, Trash2 } from 'lucide-react'
+import { Play, BookOpen, BarChart3, ChevronRight, Link2, Trash2, Users, Layers } from 'lucide-react'
 import { AppLayout } from '@/components/layout/app-layout'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -104,31 +104,47 @@ export default function LecturerDashboard() {
           </h2>
           <div className="grid gap-3">
             {live.map(lec => (
-              <Card key={lec.id} className="p-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant="green">LIVE</Badge>
+              <div key={lec.id} className="rounded-2xl border-2 border-[#22c55e]/30 bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="flex items-center gap-1.5 bg-[#22c55e] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                        LIVE
+                      </span>
                       <span className="text-xs text-[#aaaaaa]">코드: {lec.code}</span>
                     </div>
-                    <h3 className="font-semibold text-[#111111]">{lec.title}</h3>
-                    <p className="text-xs text-[#555555] mt-1">
-                      슬라이드 {lec.session?.currentSlide}/{lec.totalSlides} ·{' '}
-                      {lec.chapters.find(c => c.id === lec.session?.currentChapterId)?.title} ·{' '}
-                      수강생 {lec.studentCount}명
-                    </p>
+                    <h3 className="font-bold text-lg text-[#111111] truncate mb-2">{lec.title}</h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1 bg-[#f3f3f3] px-2.5 py-1 rounded-lg">
+                        <Users size={12} className="text-[#865FDF]" />
+                        <span className="text-xs font-medium text-[#555555]">수강생 {lec.studentCount}명</span>
+                      </div>
+                      <div className="flex items-center gap-1 bg-[#f3f3f3] px-2.5 py-1 rounded-lg">
+                        <Layers size={12} className="text-[#865FDF]" />
+                        <span className="text-xs font-medium text-[#555555]">슬라이드 {lec.session?.currentSlide ?? 1}/{lec.totalSlides}</span>
+                      </div>
+                      {lec.chapters.find(c => c.id === lec.session?.currentChapterId) && (
+                        <div className="flex items-center gap-1 bg-[#f0ebff] px-2.5 py-1 rounded-lg">
+                          <BookOpen size={12} className="text-[#865FDF]" />
+                          <span className="text-xs font-medium text-[#865FDF] truncate max-w-[140px]">
+                            {lec.chapters.find(c => c.id === lec.session?.currentChapterId)?.title}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 ml-4">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <LinkCopyButton lec={lec} />
                     <Link
                       href={`/lecturer/live/${lec.id}`}
-                      className="flex items-center gap-2 bg-[#865FDF] hover:bg-[#7450cc] text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                      className="flex items-center gap-2 bg-[#865FDF] hover:bg-[#7450cc] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm"
                     >
                       <Play size={14} /> 강의실 입장
                     </Link>
                   </div>
                 </div>
-              </Card>
+              </div>
             ))}
           </div>
         </section>
@@ -152,7 +168,6 @@ export default function LecturerDashboard() {
                   </div>
                   <div className="flex items-center gap-2 ml-4">
                     <DeleteButton lec={lec} />
-                    <LinkCopyButton lec={lec} />
                     <Link href={`/lecturer/prepare/${lec.id}`} className="flex items-center gap-1.5 text-sm text-[#865FDF] hover:text-[#7450cc] font-medium px-3 py-2 rounded-lg hover:bg-[#f0ebff] transition-colors">
                       <BookOpen size={14} /> 편집
                     </Link>

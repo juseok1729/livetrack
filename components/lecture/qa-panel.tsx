@@ -508,7 +508,7 @@ function UsersTab({ questions, lectureId }: { questions: Question[]; lectureId?:
 
 export function QAPanel({
   questions, mode, onLike, onAnswer, onAnswerWithText, onSubmit, onClearAll,
-  lectureTitle, currentChapterTitle, currentChapterSummary, userName
+  lectureTitle, currentChapterTitle, currentChapterSummary, userName, lectureId
 }: QAPanelProps) {
   // Student mode → chat UI
   if (mode === 'student') {

@@ -31,7 +31,7 @@ export function TopNav() {
 
   return (
     <header className="fixed top-0 left-0 right-0 h-14 bg-[#0a0a0a] border-b border-[#2a2a2a] flex items-center px-6 z-40">
-      <Link href="/lecturer" className="flex items-center gap-2.5 mr-auto">
+      <Link href="/" className="flex items-center gap-2.5 mr-auto">
         <div className="w-7 h-7 rounded-lg bg-[#865FDF] flex items-center justify-center flex-shrink-0">
           <GraduationCap size={14} className="text-white" />
         </div>
@@ -56,7 +56,7 @@ export function TopNav() {
               <span className="text-sm text-[#a0a0a0]">{user.name}</span>
             </div>
             <button
-              onClick={logout}
+              onClick={async () => { await logout(); router.push('/') }}
               className="flex items-center gap-1 text-xs text-[#555555] hover:text-[#ef4444] px-2 py-1.5 rounded-lg hover:bg-red-900/20 transition-colors"
             >
               <LogOut size={13} /> 로그아웃

@@ -1,4 +1,4 @@
-import { Sidebar } from './sidebar'
+import { TopNav } from './top-nav'
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -7,9 +7,9 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, noPadding }: AppLayoutProps) {
   return (
-    <div className="flex min-h-screen bg-[#f8f8f8]">
-      <Sidebar />
-      <main className={`flex-1 ml-[220px] ${noPadding ? '' : 'p-8'}`}>
+    <div className="min-h-screen bg-[#f8f8f8]">
+      <TopNav />
+      <main className={noPadding ? 'pt-14' : 'pt-[88px] px-8 pb-8'}>
         {children}
       </main>
     </div>

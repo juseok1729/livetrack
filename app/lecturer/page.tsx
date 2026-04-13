@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Play, BookOpen, BarChart3, Users, Clock, ChevronRight, PlusCircle, Link2, LogOut, Trash2 } from 'lucide-react'
+import { Play, BarChart3, ChevronRight, Link2, Trash2 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/app-layout'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -12,16 +12,10 @@ import { useAuth } from '@/contexts/auth-context'
 import type { Lecture } from '@/lib/types'
 
 const statusLabel = { preparing: '준비 중', live: '진행 중', ended: '종료됨' }
-const statusVariant = { preparing: 'yellow', live: 'green', ended: 'gray' } as const
-
-function generateCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-}
 
 export default function LecturerDashboard() {
   const router = useRouter()
-  const { user, loading: authLoading, logout } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const { state, dispatch } = useLecture()
   const { lectures } = state
   const [copyToast, setCopyToast] = useState('')
@@ -45,23 +39,6 @@ export default function LecturerDashboard() {
     navigator.clipboard.writeText(url).catch(() => {})
     setCopyToast(code)
     setTimeout(() => setCopyToast(''), 2000)
-  }
-
-  function createLecture() {
-    const code = generateCode()
-    const id = `lec-${Date.now()}`
-    const newLecture: Lecture = {
-      id,
-      title: '새 강의',
-      code,
-      status: 'preparing',
-      totalSlides: 1,
-      chapters: [],
-      studentCount: 0,
-      createdAt: new Date().toISOString(),
-    }
-    dispatch({ type: 'ADD_LECTURE', lecture: newLecture })
-    router.push(`/lecturer/prepare/${id}`)
   }
 
   function LinkCopyButton({ lec }: { lec: Lecture }) {
@@ -106,33 +83,9 @@ export default function LecturerDashboard() {
 
   return (
     <AppLayout>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-[#111111]">강의 대시보드</h1>
-          <p className="text-sm text-[#555555] mt-1">강의를 관리하고 새 강의를 시작하세요</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-sm text-[#555555]">
-            <div className="w-7 h-7 rounded-full bg-[#f0ebff] flex items-center justify-center">
-              <span className="text-xs font-semibold text-[#865FDF]">{user.name[0]}</span>
-            </div>
-            <span>{user.name}</span>
-          </div>
-          <button
-            onClick={logout}
-            className="flex items-center gap-1.5 text-xs text-[#888888] hover:text-[#ef4444] px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
-          >
-            <LogOut size={13} /> 로그아웃
-          </button>
-          <button
-            onClick={createLecture}
-            className="flex items-center gap-2 bg-[#865FDF] hover:bg-[#7450cc] text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
-          >
-            <PlusCircle size={16} />
-            새 강의 만들기
-          </button>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-[#111111]">강의 대시보드</h1>
+        <p className="text-sm text-[#555555] mt-1">강의를 관리하고 새 강의를 시작하세요</p>
       </div>
 
       {/* Copy toast */}
@@ -141,26 +94,6 @@ export default function LecturerDashboard() {
           링크가 복사되었습니다
         </div>
       )}
-
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        {[
-          { label: '전체 강의', value: lectures.length, icon: BookOpen, color: '#865FDF' },
-          { label: '진행 중', value: live.length, icon: Play, color: '#22c55e' },
-          { label: '총 수강생', value: lectures.reduce((s, l) => s + (l.studentCount ?? 0), 0), icon: Users, color: '#f59e0b' },
-          { label: '강의 시간', value: '75분', icon: Clock, color: '#3b82f6' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <Card key={label} className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-[#aaaaaa]">{label}</span>
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}15` }}>
-                <Icon size={15} style={{ color }} />
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-[#111111]">{value}</p>
-          </Card>
-        ))}
-      </div>
 
       {/* Live lectures */}
       {live.length > 0 && (

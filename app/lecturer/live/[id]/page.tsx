@@ -237,8 +237,8 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                       : 'border border-[#2a2a2a] hover:border-[#555555]'
                   }`}
                 >
-                  <p className={`text-[10px] px-2 pt-1.5 pb-1 font-medium ${isActive ? 'text-[#ff4488]' : 'text-[#555555]'}`}>
-                    챕터{idx + 1}
+                  <p className={`text-xs px-2 pt-2 pb-1.5 font-semibold truncate ${isActive ? 'text-[#ff4488]' : 'text-[#aaaaaa]'}`}>
+                    {chapter.title}
                   </p>
                   <div className="w-full aspect-video bg-[#1a1a1a] flex items-center justify-center overflow-hidden">
                     {thumbnailImage ? (
@@ -248,7 +248,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                       <span className="text-[#444444] text-[10px]">슬라이드 {chapter.slideRange[0]}</span>
                     )}
                   </div>
-                  <p className="text-[10px] text-[#666666] px-2 py-1.5 truncate">{chapter.title}</p>
                 </button>
               )
             })}

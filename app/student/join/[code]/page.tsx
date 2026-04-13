@@ -2,7 +2,7 @@
 
 import { use, useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { MessageSquare, BookOpen, Sparkles, ChevronRight, ChevronLeft, GraduationCap, ArrowRight } from 'lucide-react'
+import { MessageSquare, BookOpen, Sparkles, ChevronRight, ChevronLeft, GraduationCap, ArrowRight, Monitor, GalleryHorizontalEnd } from 'lucide-react'
 import { ChapterPanel } from '@/components/lecture/chapter-panel'
 import { QAPanel } from '@/components/lecture/qa-panel'
 import { AISummaryCard } from '@/components/lecture/ai-summary-card'
@@ -42,6 +42,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
   const [panelOpen, setPanelOpen] = useState(true)
   const [slideRatio, setSlideRatio] = useState<number>(16 / 9)
   const [screenSharing, setScreenSharing] = useState(false)
+  const [viewMode, setViewMode] = useState<'slide' | 'screenshare'>('slide')
   const mediamtxUrl = process.env.NEXT_PUBLIC_MEDIAMTX_URL ?? '/api/mediamtx'
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const likedIdsRef = useRef(likedIds)
@@ -198,7 +199,11 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
           if (update.status !== undefined) next.status = update.status
           if (update.currentSlideImage !== undefined) next.currentSlideImage = update.currentSlideImage
           if (update.currentStrokes !== undefined) next.currentStrokes = update.currentStrokes
-          if (update.screenSharing !== undefined) setScreenSharing(!!update.screenSharing)
+          if (update.screenSharing !== undefined) {
+            setScreenSharing(!!update.screenSharing)
+            if (update.screenSharing) setViewMode('screenshare')
+            else setViewMode('slide')
+          }
           if ((update.currentSlide !== undefined || update.currentChapterId !== undefined) && next.session) {
             next.session = {
               ...next.session,
@@ -493,17 +498,18 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
           </div>
         </div>
 
-        <div className="flex-1 flex items-center justify-center p-8 relative">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 gap-3 relative">
           <div
             className="bg-[#1a1a1a] rounded-2xl border border-[#2a2a2a] relative overflow-hidden shadow-lg"
             style={{
-              aspectRatio: String(screenSharing ? 16 / 9 : slideRatio),
-              maxHeight: 'calc(100vh - 7rem)',
+              aspectRatio: String(viewMode === 'screenshare' ? 16 / 9 : slideRatio),
+              maxHeight: 'calc(100vh - 9rem)',
               maxWidth: '100%',
-              width: `min(100%, calc((100vh - 7rem) * ${screenSharing ? 16 / 9 : slideRatio}))`,
+              width: `min(100%, calc((100vh - 9rem) * ${viewMode === 'screenshare' ? 16 / 9 : slideRatio}))`,
             }}
           >
-            {liveSlideImage ? (
+            {/* Slide content */}
+            {viewMode === 'slide' && (liveSlideImage ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={liveSlideImage}
@@ -524,10 +530,10 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
                   <p className="text-[#555555] text-sm">강의 화면이 여기에 표시됩니다</p>
                 </div>
               </>
-            )}
+            ))}
             <StrokeOverlay lectureId={lecture.id} externalStrokeData={lecture.currentStrokes} />
-            <ScreenShareViewer lectureId={lecture.id} mediamtxUrl={mediamtxUrl} active={screenSharing} />
-            {/* Self-view PiP — local camera stream, no WHIP needed */}
+            <ScreenShareViewer lectureId={lecture.id} mediamtxUrl={mediamtxUrl} active={screenSharing && viewMode === 'screenshare'} />
+            {/* Self-view PiP */}
             {activeStream && (
               <div className="absolute bottom-4 right-4 z-30 w-28 aspect-video rounded-xl overflow-hidden shadow-lg border-2 border-white/20 bg-black">
                 <video
@@ -537,13 +543,36 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
                 />
               </div>
             )}
-            {session && (
+            {session && viewMode === 'slide' && (
               <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/60 rounded-lg px-3 py-1.5" style={{ zIndex: 20 }}>
                 <div className="w-1.5 h-1.5 rounded-full bg-[#865FDF]" />
                 <span className="text-white text-xs">슬라이드 {session.currentSlide} · {currentChapter?.title}</span>
               </div>
             )}
           </div>
+
+          {/* View toggle — only when screen sharing */}
+          {screenSharing && (
+            <div className="flex gap-2 bg-white border border-[#e5e5e5] rounded-xl p-1 shadow-sm">
+              <button
+                onClick={() => setViewMode('slide')}
+                title="슬라이드"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
+                  ${viewMode === 'slide' ? 'bg-[#865FDF] text-white' : 'text-[#aaaaaa] hover:text-[#555555]'}`}
+              >
+                <GalleryHorizontalEnd size={14} /> 슬라이드
+              </button>
+              <button
+                onClick={() => setViewMode('screenshare')}
+                title="화면공유"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
+                  ${viewMode === 'screenshare' ? 'bg-[#865FDF] text-white' : 'text-[#aaaaaa] hover:text-[#555555]'}`}
+              >
+                <Monitor size={14} /> 화면공유
+              </button>
+            </div>
+          )}
+
           {showSummary && (
             <div className="absolute bottom-8 left-8 z-20">
               <AISummaryCard chapterTitle={summaryData.chapter} summary={summaryData.text} onClose={() => setShowSummary(false)} />

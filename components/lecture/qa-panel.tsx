@@ -536,6 +536,7 @@ export function QAPanel({
       currentChapterTitle={currentChapterTitle}
       currentChapterSummary={currentChapterSummary}
       userName={userName ?? '강사'}
+      lectureId={lectureId}
     />
   )
 }

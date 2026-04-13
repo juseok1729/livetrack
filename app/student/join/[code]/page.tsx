@@ -8,6 +8,7 @@ import { QAPanel } from '@/components/lecture/qa-panel'
 import { AISummaryCard } from '@/components/lecture/ai-summary-card'
 import { StrokeOverlay } from '@/components/lecture/stroke-overlay'
 import { ScreenShareViewer } from '@/components/lecture/screen-share-viewer'
+import { StudentCamPublisher } from '@/components/lecture/student-cam-publisher'
 import { Badge } from '@/components/ui/badge'
 import type { Lecture, Question } from '@/lib/types'
 
@@ -26,6 +27,10 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
   // Nickname / lobby state
   const [nickname, setNickname] = useState<string | null>(null)
   const [nicknameInput, setNicknameInput] = useState('')
+  const [cameraOn, setCameraOn] = useState(false)
+  const [activeStream, setActiveStream] = useState<MediaStream | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
 
   const [lecture, setLecture] = useState<StudentLecture | null | undefined>(undefined)
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null)
@@ -41,6 +46,16 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const likedIdsRef = useRef(likedIds)
   likedIdsRef.current = likedIds
+
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+      }
+    }
+  }, [])
 
   // Restore saved nickname & panel state
   useEffect(() => {
@@ -60,7 +75,39 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
   function handleEnter() {
     const name = nicknameInput.trim() || '익명'
     localStorage.setItem(NICKNAME_KEY, name)
+    // Transfer camera stream to live view (publisher will stop it on unmount)
+    if (cameraOn && streamRef.current) {
+      setActiveStream(streamRef.current)
+      streamRef.current = null
+    } else {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+      }
+    }
     setNickname(name)
+  }
+
+  async function toggleCamera(on: boolean) {
+    setCameraOn(on)
+    if (!on) {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+      }
+      if (videoRef.current) videoRef.current.srcObject = null
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.play()
+      }
+    } catch {
+      setCameraOn(false)
+    }
   }
 
   // Fetch lecture state
@@ -181,65 +228,122 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
   // ── Lobby (nickname not set yet) ─────────────────────────────────────────
   if (nickname === null) {
     return (
-      <div className="min-h-screen bg-[#f3f0ff] flex items-center justify-center p-4">
-        <div className="w-full max-w-sm">
+      <div className="min-h-screen flex">
+        {/* Left panel */}
+        <div className="w-[420px] flex-shrink-0 bg-white flex flex-col px-10 py-10 min-h-screen">
           {/* Logo */}
-          <div className="flex items-center gap-2 justify-center mb-8">
-            <div className="w-8 h-8 rounded-lg bg-[#865FDF] flex items-center justify-center">
-              <GraduationCap size={16} className="text-white" />
+          <div className="flex items-center gap-2.5 mb-12">
+            <div className="w-9 h-9 rounded-xl bg-[#865FDF] flex items-center justify-center">
+              <GraduationCap size={18} className="text-white" />
             </div>
-            <span className="font-semibold text-[#111111] text-base">LiveTrack</span>
+            <span className="font-bold text-[#111111] text-lg tracking-tight">LiveTrack</span>
           </div>
 
-          <div className="bg-white rounded-2xl border border-[#e5e5e5] shadow-sm overflow-hidden">
-            {/* Thumbnail */}
-            <div className="w-full aspect-video bg-[#0a0a0a] flex items-center justify-center overflow-hidden">
-              {thumbnailUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={thumbnailUrl} alt="강의 썸네일" className="w-full h-full object-contain" />
-              ) : (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-[#865FDF]/20 flex items-center justify-center">
-                    <Sparkles size={22} className="text-[#865FDF]" />
-                  </div>
-                  <p className="text-[#555555] text-xs">슬라이드 미리보기 없음</p>
-                </div>
-              )}
-            </div>
-
-            {/* Lecture info + nickname input */}
-            <div className="p-6">
-              <div className="mb-1">
-                {lecture.status === 'live' ? (
-                  <span className="inline-flex items-center gap-1.5 bg-[#22c55e] text-white text-[10px] font-bold px-2 py-0.5 rounded-full mb-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> LIVE
-                  </span>
-                ) : lecture.status === 'preparing' ? (
-                  <span className="inline-block bg-amber-100 text-amber-700 text-[10px] font-semibold px-2 py-0.5 rounded-full mb-2">준비 중</span>
-                ) : (
-                  <span className="inline-block bg-[#f3f3f3] text-[#aaaaaa] text-[10px] font-semibold px-2 py-0.5 rounded-full mb-2">종료됨</span>
-                )}
-              </div>
-              <h2 className="text-lg font-bold text-[#111111] mb-1">{lecture.title}</h2>
-              <p className="text-xs text-[#aaaaaa] mb-5">
-                {lecture.totalSlides}장 슬라이드 · {lecture.chapters.length}개 챕터
-              </p>
-
-              <label className="block text-xs font-medium text-[#555555] mb-1.5">닉네임</label>
+          <div className="flex-1 flex flex-col justify-center gap-7">
+            {/* Nickname */}
+            <div>
+              <label className="block text-sm font-semibold text-[#111111] mb-2">닉네임</label>
               <input
                 value={nicknameInput}
                 onChange={e => setNicknameInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && handleEnter()}
-                placeholder="강의에서 사용할 이름을 입력하세요"
-                className="w-full px-3.5 py-2.5 text-sm border border-[#e5e5e5] rounded-xl outline-none focus:border-[#865FDF] focus:ring-2 focus:ring-[#865FDF]/10 transition placeholder:text-[#cccccc] mb-4"
+                placeholder="닉네임을 입력해주세요"
+                className="w-full px-4 py-3.5 text-sm border-2 border-[#e5e5e5] rounded-xl outline-none focus:border-[#865FDF] transition-colors placeholder:text-[#cccccc]"
                 autoFocus
               />
-              <button
-                onClick={handleEnter}
-                className="w-full flex items-center justify-center gap-2 bg-[#865FDF] hover:bg-[#7450cc] text-white font-semibold py-2.5 rounded-xl transition-colors"
-              >
-                강의 입장하기 <ArrowRight size={16} />
-              </button>
+            </div>
+
+            {/* Camera */}
+            <div>
+              <label className="block text-sm font-semibold text-[#111111] mb-2">카메라</label>
+              <div className="w-full aspect-video bg-[#f0f0f0] rounded-xl overflow-hidden flex items-center justify-center relative mb-3">
+                {cameraOn ? (
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-2">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#bbbbbb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 3l18 18M11 11a3 3 0 004.243 4.243M6.757 6.757A3 3 0 0012 12" />
+                      <path d="M9 3h6l2 2h3a1 1 0 011 1v11M3 8a1 1 0 011-1h1" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+              {/* ON / OFF toggle */}
+              <div className="flex items-center gap-5">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="camera"
+                    checked={cameraOn}
+                    onChange={() => toggleCamera(true)}
+                    className="accent-[#865FDF] w-4 h-4"
+                  />
+                  <span className="text-sm text-[#111111]">ON</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="camera"
+                    checked={!cameraOn}
+                    onChange={() => toggleCamera(false)}
+                    className="accent-[#865FDF] w-4 h-4"
+                  />
+                  <span className="text-sm text-[#111111]">OFF</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Enter button */}
+          <button
+            onClick={handleEnter}
+            className="w-full flex items-center justify-center gap-2 bg-[#865FDF] hover:bg-[#7450cc] active:bg-[#6340bb] text-white font-bold py-4 rounded-2xl text-base transition-colors mt-8"
+          >
+            강의 입장하기 <ArrowRight size={18} />
+          </button>
+        </div>
+
+        {/* Right panel */}
+        <div className="flex-1 bg-[#f5f5f5] flex items-center justify-center p-12">
+          <div className="w-full max-w-2xl">
+            {/* Slide thumbnail */}
+            <div className="w-full aspect-video bg-[#0a0a0a] rounded-2xl overflow-hidden shadow-xl mb-0">
+              {thumbnailUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={thumbnailUrl} alt="강의 썸네일" className="w-full h-full object-contain" />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                  <div className="w-14 h-14 rounded-2xl bg-[#865FDF]/20 flex items-center justify-center">
+                    <Sparkles size={26} className="text-[#865FDF]" />
+                  </div>
+                  <p className="text-[#555555] text-sm">슬라이드 미리보기 없음</p>
+                </div>
+              )}
+            </div>
+
+            {/* Info card */}
+            <div className="bg-white rounded-b-2xl px-6 py-4 shadow-xl flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-[#111111] mb-0.5">{lecture.title}</h2>
+                <p className="text-sm text-[#888888]">
+                  {lecture.totalSlides}장 슬라이드 · {lecture.chapters.length}개 챕터
+                </p>
+              </div>
+              {lecture.status === 'live' ? (
+                <span className="inline-flex items-center gap-1.5 bg-[#22c55e] text-white text-xs font-bold px-3 py-1.5 rounded-full flex-shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> 진행중
+                </span>
+              ) : lecture.status === 'preparing' ? (
+                <span className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-700 text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0">준비 중</span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 bg-[#f3f3f3] text-[#aaaaaa] text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0">종료됨</span>
+              )}
             </div>
           </div>
         </div>
@@ -333,6 +437,15 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
 
   return (
     <div className="flex h-screen bg-[#f8f8f8] overflow-hidden">
+      {/* Camera publisher (invisible) */}
+      {activeStream && nickname && (
+        <StudentCamPublisher
+          lectureId={lecture.id}
+          nickname={nickname}
+          stream={activeStream}
+          mediamtxUrl={mediamtxUrl}
+        />
+      )}
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 relative">
         <div className="h-14 bg-white border-b border-[#e5e5e5] flex items-center px-6 gap-4 flex-shrink-0">

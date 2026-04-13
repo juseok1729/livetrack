@@ -388,6 +388,22 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
             currentChapterTitle={currentChapter?.title}
             currentChapterSummary={currentChapter?.summary}
             onClearAll={() => dispatch({ type: 'CLEAR_QUESTIONS', lectureId: id })}
+            userName={user.name}
+            onSubmit={async (content, name) => {
+              const q = {
+                id: crypto.randomUUID(),
+                lecture_id: id,
+                chapterId: session?.currentChapterId ?? '',
+                studentName: name,
+                content,
+                createdAt: new Date().toISOString(),
+              }
+              await fetch(`/api/lectures/${id}/questions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(q),
+              })
+            }}
           />
         </div>
       </div>

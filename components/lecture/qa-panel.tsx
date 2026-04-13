@@ -1,11 +1,10 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Heart, CheckCheck, MessageSquare, ChevronDown, Send, Sparkles, Trash2 } from 'lucide-react'
+import { Heart, CheckCheck, MessageSquare, ChevronDown, Send, Sparkles, Trash2, Users, VideoOff } from 'lucide-react'
 import type { Question } from '@/lib/types'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/input'
+import { StudentCamViewer } from '@/components/lecture/student-cam-viewer'
 
 interface QAPanelProps {
   questions: Question[]
@@ -73,24 +72,23 @@ function buildGroupsFromAI(
   }).filter(Boolean) as QuestionGroup[]
 }
 
-// ─── Student chat mode ───────────────────────────────────────────────────────
+// ─── Chat Panel (shared by student + lecturer chat tab) ──────────────────────
 
-function ChatPanel({ questions, onLike, onSubmit, userName }: {
+function ChatPanel({ questions, onLike, onSubmit, userName, placeholder }: {
   questions: Question[]
   onLike?: (id: string) => void
   onSubmit?: (content: string, name: string) => void
   userName: string
+  placeholder?: string
 }) {
   const [text, setText] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Sort ascending by createdAt so newest is at bottom
   const sorted = [...questions].sort((a, b) =>
     new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   )
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [questions.length])
@@ -111,12 +109,11 @@ function ChatPanel({ questions, onLike, onSubmit, userName }: {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
         {sorted.length === 0 && (
           <div className="flex flex-col items-center gap-2 py-12 text-center">
             <MessageSquare size={24} className="text-[#cccccc]" />
-            <p className="text-xs text-[#aaaaaa]">첫 질문을 남겨보세요</p>
+            <p className="text-xs text-[#aaaaaa]">아직 메시지가 없습니다</p>
           </div>
         )}
         {sorted.map(q => {
@@ -126,7 +123,6 @@ function ChatPanel({ questions, onLike, onSubmit, userName }: {
             : ''
           return (
             <div key={q.id} className={`flex flex-col gap-0.5 ${isMe ? 'items-end' : 'items-start'}`}>
-              {/* Name + time row */}
               <div className={`flex items-center gap-1.5 px-1 ${isMe ? 'flex-row-reverse' : ''}`}>
                 {!isMe && (
                   <div className="w-5 h-5 rounded-full bg-[#865FDF]/10 flex items-center justify-center flex-shrink-0">
@@ -136,8 +132,6 @@ function ChatPanel({ questions, onLike, onSubmit, userName }: {
                 <span className="text-[10px] text-[#888888] font-medium">{q.studentName}</span>
                 <span className="text-[10px] text-[#cccccc]">{time}</span>
               </div>
-
-              {/* Bubble */}
               <div
                 className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm leading-relaxed break-words
                   ${isMe
@@ -149,8 +143,6 @@ function ChatPanel({ questions, onLike, onSubmit, userName }: {
               >
                 {q.content}
               </div>
-
-              {/* Answered badge + like */}
               <div className={`flex items-center gap-2 px-1 ${isMe ? 'flex-row-reverse' : ''}`}>
                 {q.answered && (
                   <div className="flex items-center gap-0.5 text-[#22c55e]">
@@ -175,14 +167,13 @@ function ChatPanel({ questions, onLike, onSubmit, userName }: {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input bar */}
       <div className="border-t border-[#e5e5e5] px-3 py-3 flex items-center gap-2 bg-white">
         <input
           ref={inputRef}
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="질문을 입력하세요..."
+          placeholder={placeholder ?? '메시지를 입력하세요...'}
           className="flex-1 px-3 py-2 text-sm border border-[#e5e5e5] rounded-xl outline-none focus:border-[#865FDF] focus:ring-2 focus:ring-[#865FDF]/10 transition placeholder:text-[#cccccc]"
         />
         <button
@@ -197,42 +188,26 @@ function ChatPanel({ questions, onLike, onSubmit, userName }: {
   )
 }
 
-// ─── Lecturer card mode ───────────────────────────────────────────────────────
+// ─── Q&A Tab (lecturer) ───────────────────────────────────────────────────────
 
-export function QAPanel({ questions, mode, onLike, onAnswer, onAnswerWithText, onSubmit, onClearAll, lectureTitle, currentChapterTitle, currentChapterSummary, userName }: QAPanelProps) {
-  // Student mode → chat UI
-  if (mode === 'student') {
-    return (
-      <ChatPanel
-        questions={questions}
-        onLike={onLike}
-        onSubmit={onSubmit}
-        userName={userName ?? '익명'}
-      />
-    )
-  }
-
-  // Lecturer mode → existing card UI
-  return <LecturerQAPanel
-    questions={questions}
-    onLike={onLike}
-    onAnswer={onAnswer}
-    onAnswerWithText={onAnswerWithText}
-    onClearAll={onClearAll}
-    lectureTitle={lectureTitle}
-    currentChapterTitle={currentChapterTitle}
-    currentChapterSummary={currentChapterSummary}
-  />
-}
-
-function LecturerQAPanel({ questions, onLike, onAnswer, onAnswerWithText, onClearAll, lectureTitle, currentChapterTitle, currentChapterSummary }: Omit<QAPanelProps, 'mode' | 'onSubmit' | 'lectureId' | 'currentChapterId' | 'userName'>) {
+function QATab({ questions, onLike, onAnswer, onClearAll, lectureTitle, currentChapterTitle, currentChapterSummary, lecturerName }: {
+  questions: Question[]
+  onLike?: (id: string) => void
+  onAnswer?: (id: string) => void
+  onClearAll?: () => void
+  lectureTitle?: string
+  currentChapterTitle?: string
+  currentChapterSummary?: string
+  lecturerName?: string
+}) {
   const [showAnswered, setShowAnswered] = useState(false)
   const [sortMode, setSortMode] = useState<'popular' | 'recent'>('popular')
   const [aiGroups, setAiGroups] = useState<QuestionGroup[] | null>(null)
   const [grouping, setGrouping] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const unansweredQuestions = questions.filter(q => !q.answered)
+  const studentQuestions = lecturerName ? questions.filter(q => q.studentName !== lecturerName) : questions
+  const unansweredQuestions = studentQuestions.filter(q => !q.answered)
   const unansweredKey = unansweredQuestions.map(q => q.id).join(',')
   const unansweredRef = useRef(unansweredQuestions)
   unansweredRef.current = unansweredQuestions
@@ -270,7 +245,7 @@ function LecturerQAPanel({ questions, onLike, onAnswer, onAnswerWithText, onClea
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unansweredKey, fetchGroups])
 
-  const answeredGroups = buildGroupsFromQuestions(questions.filter(q => q.answered))
+  const answeredGroups = buildGroupsFromQuestions(studentQuestions.filter(q => q.answered))
 
   const unanswered = (aiGroups ?? buildGroupsFromQuestions(unansweredQuestions))
     .slice()
@@ -286,17 +261,15 @@ function LecturerQAPanel({ questions, onLike, onAnswer, onAnswerWithText, onClea
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-5 py-4 border-b border-[#e5e5e5] flex items-center justify-between">
+      {/* Sub-header */}
+      <div className="px-4 py-2.5 border-b border-[#e5e5e5] flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <MessageSquare size={16} className="text-[#865FDF]" />
-          <span className="text-sm font-semibold text-[#111111]">Q&A</span>
           {grouping && <Sparkles size={11} className="text-[#865FDF] animate-spin" />}
-        </div>
-        <div className="flex items-center gap-2">
           {unanswered.length > 0 && (
             <Badge variant="purple">{unanswered.length}개 대기중</Badge>
           )}
+        </div>
+        <div className="flex items-center gap-2">
           {unanswered.length > 1 && (
             <button
               onClick={() => setSortMode(m => m === 'popular' ? 'recent' : 'popular')}
@@ -317,7 +290,6 @@ function LecturerQAPanel({ questions, onLike, onAnswer, onAnswerWithText, onClea
         </div>
       </div>
 
-      {/* Questions list */}
       <div className="flex-1 overflow-y-auto">
         <div className="px-3 py-2">
           {unanswered.length === 0 && (
@@ -330,13 +302,9 @@ function LecturerQAPanel({ questions, onLike, onAnswer, onAnswerWithText, onClea
             <GroupCard
               key={g.key}
               group={g}
-              mode="lecturer"
-              lectureTitle={lectureTitle}
-              chapterTitle={currentChapterTitle}
-              chapterSummary={currentChapterSummary}
               onLike={() => onLike?.(g.representativeId)}
               onAnswer={() => g.ids.forEach(id => onAnswer?.(id))}
-              onAnswerWithText={(text) => g.ids.forEach(id => onAnswerWithText?.(id, text))}
+              onAnswerSingle={id => onAnswer?.(id)}
             />
           ))}
         </div>
@@ -354,13 +322,9 @@ function LecturerQAPanel({ questions, onLike, onAnswer, onAnswerWithText, onClea
               <GroupCard
                 key={g.key}
                 group={g}
-                mode="lecturer"
                 onLike={() => onLike?.(g.representativeId)}
-                onAnswer={() => {}}
-                onAnswerWithText={() => {}}
-                lectureTitle={lectureTitle}
-                chapterTitle={currentChapterTitle}
-                chapterSummary={currentChapterSummary}
+                onAnswer={() => g.ids.forEach(id => onAnswer?.(id))}
+                onAnswerSingle={id => onAnswer?.(id)}
               />
             ))}
           </div>
@@ -370,51 +334,14 @@ function LecturerQAPanel({ questions, onLike, onAnswer, onAnswerWithText, onClea
   )
 }
 
-function GroupCard({ group: g, mode, onLike, onAnswer, onAnswerWithText, lectureTitle, chapterTitle, chapterSummary }: {
+function GroupCard({ group: g, onLike, onAnswer, onAnswerSingle }: {
   group: QuestionGroup
-  mode: 'lecturer' | 'student'
   onLike: () => void
   onAnswer: () => void
-  onAnswerWithText: (text: string) => void
-  lectureTitle?: string
-  chapterTitle?: string
-  chapterSummary?: string
+  onAnswerSingle?: (id: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [answerText, setAnswerText] = useState('')
-  const [aiLoading, setAiLoading] = useState(false)
   const count = g.ids.length
-
-  async function generateAiAnswer() {
-    setAiLoading(true)
-    try {
-      const res = await fetch('/api/answer-question', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: g.content,
-          lectureTitle: lectureTitle ?? '',
-          chapterTitle,
-          chapterSummary,
-        }),
-      })
-      if (!res.ok) throw new Error('failed')
-      const data = await res.json()
-      setAnswerText(data.answer ?? '')
-      setExpanded(true)
-    } catch {
-      setAnswerText('AI 답변 생성에 실패했습니다.')
-    } finally {
-      setAiLoading(false)
-    }
-  }
-
-  function submitAnswer() {
-    if (!answerText.trim()) { onAnswer(); return }
-    onAnswerWithText(answerText.trim())
-    setAnswerText('')
-    setExpanded(false)
-  }
 
   return (
     <div
@@ -469,16 +396,16 @@ function GroupCard({ group: g, mode, onLike, onAnswer, onAnswerWithText, lecture
             <Heart size={12} />
             {g.totalLikes > 0 ? g.totalLikes : ''}
           </button>
-          {mode === 'lecturer' && !g.answered && (
+          {!g.answered && (
             <div className="flex items-center gap-1">
-              <button
-                onClick={e => { e.stopPropagation(); generateAiAnswer() }}
-                disabled={aiLoading}
-                className="flex items-center gap-1 text-[10px] text-[#865FDF] bg-[#f0ebff] hover:bg-[#e8e0ff] px-2 py-1 rounded-lg transition-colors disabled:opacity-50"
-              >
-                <Sparkles size={10} className={aiLoading ? 'animate-spin' : ''} />
-                {aiLoading ? '생성 중...' : 'AI 답변'}
-              </button>
+              {g.members.length === 1 && (
+                <button
+                  onClick={e => { e.stopPropagation(); onAnswer() }}
+                  className="flex items-center gap-1 text-[10px] text-[#22c55e] bg-[#f0fdf4] hover:bg-[#dcfce7] px-2 py-1 rounded-lg transition-colors"
+                >
+                  <CheckCheck size={11} /> 답변 완료
+                </button>
+              )}
               <span className="text-[10px] text-[#cccccc]">{expanded ? '▲' : '▼'}</span>
             </div>
           )}
@@ -490,7 +417,18 @@ function GroupCard({ group: g, mode, onLike, onAnswer, onAnswerWithText, lecture
           <p className="text-[10px] font-semibold text-[#aaaaaa] uppercase tracking-wide mb-1.5">묶인 질문 ({g.members.length}개)</p>
           <div className="flex flex-col gap-1.5">
             {g.members.map(m => (
-              <div key={m.id} className="flex items-start justify-between gap-2 py-1 border-b border-[#f8f8f8] last:border-0">
+              <div key={m.id} className="flex items-start gap-2 py-1 border-b border-[#f8f8f8] last:border-0">
+                <button
+                  onClick={e => { e.stopPropagation(); onAnswerSingle ? onAnswerSingle(m.id) : onAnswer() }}
+                  title="답변 완료 토글"
+                  className={`mt-0.5 w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center transition-colors
+                    ${m.answered
+                      ? 'bg-[#22c55e] border-[#22c55e] text-white'
+                      : 'border-[#cccccc] hover:border-[#22c55e]'
+                    }`}
+                >
+                  {m.answered && <CheckCheck size={9} />}
+                </button>
                 <p className="text-xs text-[#333333] leading-snug flex-1">{m.content}</p>
                 <span className="text-[10px] text-[#aaaaaa] flex-shrink-0 mt-0.5">{m.studentName}</span>
               </div>
@@ -498,34 +436,187 @@ function GroupCard({ group: g, mode, onLike, onAnswer, onAnswerWithText, lecture
           </div>
         </div>
       )}
+    </div>
+  )
+}
 
-      {mode === 'lecturer' && expanded && !g.answered && (
-        <div className="px-3 pb-3 border-t border-[#f3f3f3] pt-2.5" onClick={e => e.stopPropagation()}>
-          <Textarea
-            placeholder="답변을 입력하세요 (비워두면 완료만 처리)..."
-            value={answerText}
-            onChange={e => setAnswerText(e.target.value)}
-            rows={2}
-            className="text-xs mb-2"
-            autoFocus
-            onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) submitAnswer() }}
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={submitAnswer}
-              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-[#865FDF] hover:bg-[#7450cc] text-white text-xs font-medium transition-colors"
-            >
-              <Send size={12} /> 답변 완료
-            </button>
-            <button
-              onClick={() => setExpanded(false)}
-              className="px-3 py-1.5 rounded-lg border border-[#e5e5e5] text-xs text-[#aaaaaa] hover:text-[#555555] transition-colors"
-            >
-              취소
-            </button>
-          </div>
+// ─── Users Tab ────────────────────────────────────────────────────────────────
+
+function UsersTab({ questions, lectureId }: { questions: Question[]; lectureId?: string }) {
+  const mediamtxUrl = process.env.NEXT_PUBLIC_MEDIAMTX_URL ?? '/api/mediamtx'
+  const [activeCameras, setActiveCameras] = useState<string[]>([])
+
+  useEffect(() => {
+    if (!lectureId) return
+    const fetch_ = () =>
+      fetch(`/api/lectures/${lectureId}/cameras`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.cameras) setActiveCameras(d.cameras.map((c: { nickname: string }) => c.nickname)) })
+        .catch(() => {})
+    fetch_()
+    const t = setInterval(fetch_, 3000)
+    return () => clearInterval(t)
+  }, [lectureId])
+
+  const users = [...new Set(questions.map(q => q.studentName))].sort()
+
+  return (
+    <div className="flex-1 overflow-y-auto px-3 py-3">
+      {users.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-12 text-center">
+          <Users size={24} className="text-[#cccccc]" />
+          <p className="text-xs text-[#aaaaaa]">참여한 수강생이 없습니다</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-0">
+          <p className="text-[10px] font-semibold text-[#aaaaaa] uppercase tracking-wide mb-2 px-1">
+            참여자 {users.length}명
+          </p>
+          {users.map(name => {
+            const hasCamera = activeCameras.includes(name)
+            return (
+              <div key={name} className="border-b border-[#f3f3f3] last:border-0">
+                {hasCamera ? (
+                  /* Camera-on: show avatar + name above, video tile below */
+                  <div className="py-3 px-1">
+                    <div className="flex items-center gap-2.5 mb-2">
+                      <div className="w-7 h-7 rounded-full bg-[#865FDF]/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-semibold text-[#865FDF]">{name[0]}</span>
+                      </div>
+                      <span className="text-sm font-medium text-[#111111]">{name}</span>
+                    </div>
+                    {lectureId && (
+                      <StudentCamViewer lectureId={lectureId} nickname={name} mediamtxUrl={mediamtxUrl} />
+                    )}
+                  </div>
+                ) : (
+                  /* Camera-off: compact single row */
+                  <div className="flex items-center gap-2.5 py-3 px-1">
+                    <div className="w-7 h-7 rounded-full bg-[#865FDF]/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-semibold text-[#865FDF]">{name[0]}</span>
+                    </div>
+                    <span className="text-sm text-[#111111]">{name}</span>
+                    <VideoOff size={15} className="ml-auto text-[#cccccc]" />
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Main QAPanel ─────────────────────────────────────────────────────────────
+
+export function QAPanel({
+  questions, mode, onLike, onAnswer, onAnswerWithText, onSubmit, onClearAll,
+  lectureTitle, currentChapterTitle, currentChapterSummary, userName
+}: QAPanelProps) {
+  // Student mode → chat UI
+  if (mode === 'student') {
+    return (
+      <ChatPanel
+        questions={questions}
+        onLike={onLike}
+        onSubmit={onSubmit}
+        userName={userName ?? '익명'}
+        placeholder="질문을 입력하세요..."
+      />
+    )
+  }
+
+  // Lecturer mode → 3-tab UI
+  return (
+    <LecturerPanel
+      questions={questions}
+      onLike={onLike}
+      onAnswer={onAnswer}
+      onAnswerWithText={onAnswerWithText}
+      onSubmit={onSubmit}
+      onClearAll={onClearAll}
+      lectureTitle={lectureTitle}
+      currentChapterTitle={currentChapterTitle}
+      currentChapterSummary={currentChapterSummary}
+      userName={userName ?? '강사'}
+    />
+  )
+}
+
+type Tab = 'chat' | 'qna' | 'users'
+
+function LecturerPanel({
+  questions, onLike, onAnswer, onAnswerWithText, onSubmit, onClearAll,
+  lectureTitle, currentChapterTitle, currentChapterSummary, userName, lectureId
+}: Omit<QAPanelProps, 'mode'> & { userName: string }) {
+  const [tab, setTab] = useState<Tab>('chat')
+
+  const studentQuestions = questions.filter(q => q.studentName !== userName)
+  const unansweredCount = studentQuestions.filter(q => !q.answered).length
+  const userCount = new Set(studentQuestions.map(q => q.studentName)).size
+
+  const tabs: { id: Tab; label: string; badge?: number }[] = [
+    { id: 'chat', label: '채팅' },
+    { id: 'qna', label: 'Q&A', badge: unansweredCount || undefined },
+    { id: 'users', label: '유저리스트', badge: userCount || undefined },
+  ]
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Tab bar */}
+      <div className="flex border-b border-[#e5e5e5] flex-shrink-0">
+        {tabs.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-colors relative
+              ${tab === t.id
+                ? 'text-[#865FDF]'
+                : 'text-[#aaaaaa] hover:text-[#555555]'
+              }`}
+          >
+            {t.label}
+            {t.badge !== undefined && t.badge > 0 && (
+              <span className={`text-[9px] font-semibold px-1 py-0.5 rounded-full min-w-[14px] text-center
+                ${tab === t.id ? 'bg-[#865FDF] text-white' : 'bg-[#e5e5e5] text-[#888888]'}`}>
+                {t.badge}
+              </span>
+            )}
+            {tab === t.id && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#865FDF] rounded-t-full" />
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+        {tab === 'chat' && (
+          <ChatPanel
+            questions={questions}
+            onLike={onLike}
+            onSubmit={onSubmit}
+            userName={userName}
+            placeholder="채팅 메시지를 입력하세요..."
+          />
+        )}
+        {tab === 'qna' && (
+          <QATab
+            questions={questions}
+            onLike={onLike}
+            onAnswer={onAnswer}
+            onClearAll={onClearAll}
+            lectureTitle={lectureTitle}
+            currentChapterTitle={currentChapterTitle}
+            currentChapterSummary={currentChapterSummary}
+            lecturerName={userName}
+          />
+        )}
+        {tab === 'users' && (
+          <UsersTab questions={studentQuestions} lectureId={lectureId} />
+        )}
+      </div>
     </div>
   )
 }

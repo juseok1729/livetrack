@@ -121,17 +121,21 @@ function ChatPanel({ questions, onLike, onSubmit, userName }: {
         )}
         {sorted.map(q => {
           const isMe = q.studentName === userName
+          const time = q.createdAt
+            ? new Date(q.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+            : ''
           return (
-            <div key={q.id} className={`flex flex-col gap-1 ${isMe ? 'items-end' : 'items-start'}`}>
-              {/* Name label (others only) */}
-              {!isMe && (
-                <div className="flex items-center gap-1.5 ml-1">
+            <div key={q.id} className={`flex flex-col gap-0.5 ${isMe ? 'items-end' : 'items-start'}`}>
+              {/* Name + time row */}
+              <div className={`flex items-center gap-1.5 px-1 ${isMe ? 'flex-row-reverse' : ''}`}>
+                {!isMe && (
                   <div className="w-5 h-5 rounded-full bg-[#865FDF]/10 flex items-center justify-center flex-shrink-0">
                     <span className="text-[9px] font-semibold text-[#865FDF]">{q.studentName[0]}</span>
                   </div>
-                  <span className="text-[10px] text-[#aaaaaa] font-medium">{q.studentName}</span>
-                </div>
-              )}
+                )}
+                <span className="text-[10px] text-[#888888] font-medium">{q.studentName}</span>
+                <span className="text-[10px] text-[#cccccc]">{time}</span>
+              </div>
 
               {/* Bubble */}
               <div

@@ -3,15 +3,12 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, BookOpen, BarChart3, Settings, GraduationCap, Plus
+  LayoutDashboard, GraduationCap, Plus
 } from 'lucide-react'
 import { useLecture } from '@/contexts/lecture-context'
 
 const navItems = [
   { href: '/lecturer', icon: LayoutDashboard, label: '대시보드' },
-  { href: '/lecturer/prepare/lec-002', icon: BookOpen, label: '강의 준비' },
-  { href: '/lecturer/report/lec-003', icon: BarChart3, label: '리포트' },
-  { href: '#', icon: Settings, label: '설정' },
 ]
 
 export function Sidebar() {

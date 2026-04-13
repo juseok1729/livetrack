@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
-import { GripVertical, Pencil, Trash2, Plus, Check, X, Merge } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { GripVertical, Pencil, Trash2, Plus, Check, X, Merge, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Chapter } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 
@@ -17,6 +17,18 @@ export function ChapterEditor({ chapters, onChange, slides }: ChapterEditorProps
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [lightbox, setLightbox] = useState<number | null>(null) // slide index (0-based)
+
+  useEffect(() => {
+    if (lightbox === null) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightbox(null)
+      if (e.key === 'ArrowRight' && slides) setLightbox(i => i !== null ? Math.min(i + 1, slides.length - 1) : null)
+      if (e.key === 'ArrowLeft') setLightbox(i => i !== null ? Math.max(i - 1, 0) : null)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [lightbox, slides])
 
   function startEdit(ch: Chapter) {
     setEditingId(ch.id)
@@ -163,11 +175,15 @@ export function ChapterEditor({ chapters, onChange, slides }: ChapterEditorProps
                     key={i}
                     src={slides[i]}
                     alt={`슬라이드 ${i + 1}`}
-                    className="w-10 h-7 object-cover rounded border border-[#e5e5e5] flex-shrink-0"
+                    onClick={e => { e.stopPropagation(); setLightbox(i) }}
+                    className="w-10 h-7 object-cover rounded border border-[#e5e5e5] flex-shrink-0 cursor-zoom-in hover:border-[#865FDF] hover:scale-105 transition-transform"
                   />
                 ))}
                 {overflow > 0 && (
-                  <div className="w-10 h-7 rounded border border-[#e5e5e5] bg-[#f3f3f3] flex items-center justify-center flex-shrink-0">
+                  <div
+                    onClick={e => { e.stopPropagation(); setLightbox(end - overflow + 1) }}
+                    className="w-10 h-7 rounded border border-[#e5e5e5] bg-[#f3f3f3] flex items-center justify-center flex-shrink-0 cursor-pointer hover:border-[#865FDF] hover:bg-[#f0ebff] transition-colors"
+                  >
                     <span className="text-[10px] text-[#aaaaaa] font-medium">+{overflow}</span>
                   </div>
                 )}
@@ -201,6 +217,50 @@ export function ChapterEditor({ chapters, onChange, slides }: ChapterEditorProps
       >
         <Plus size={15} /> 챕터 추가
       </button>
+
+      {/* Lightbox */}
+      {lightbox !== null && slides && slides[lightbox] && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center"
+          onClick={() => setLightbox(null)}
+        >
+          {/* Prev */}
+          <button
+            onClick={e => { e.stopPropagation(); setLightbox(i => i !== null ? Math.max(i - 1, 0) : null) }}
+            disabled={lightbox === 0}
+            className="absolute left-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-20 transition-colors"
+          >
+            <ChevronLeft size={28} />
+          </button>
+
+          <div className="flex flex-col items-center gap-3 px-16" onClick={e => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={slides[lightbox]}
+              alt={`슬라이드 ${lightbox + 1}`}
+              className="max-w-[80vw] max-h-[80vh] rounded-xl shadow-2xl object-contain"
+            />
+            <span className="text-white/60 text-sm">{lightbox + 1} / {slides.length}</span>
+          </div>
+
+          {/* Next */}
+          <button
+            onClick={e => { e.stopPropagation(); setLightbox(i => i !== null ? Math.min(i + 1, slides.length - 1) : null) }}
+            disabled={lightbox === slides.length - 1}
+            className="absolute right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-20 transition-colors"
+          >
+            <ChevronRight size={28} />
+          </button>
+
+          {/* Close */}
+          <button
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

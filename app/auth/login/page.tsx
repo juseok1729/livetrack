@@ -62,6 +62,31 @@ function LoginForm() {
             </div>
           )}
 
+          {/* Quick admin login for reviewers */}
+          <button
+            type="button"
+            onClick={async () => {
+              setEmail('admin@livetrack.com')
+              setPassword('kkkkkk')
+              setError('')
+              setSubmitting(true)
+              const result = await login('admin@livetrack.com', 'kkkkkk')
+              setSubmitting(false)
+              if (!result.ok) { setError(result.error ?? ''); return }
+              router.push(redirect || '/')
+            }}
+            className="w-full py-2.5 rounded-xl bg-[#f5f2ff] hover:bg-[#ede8ff] border border-[#865FDF]/30 text-[#865FDF] text-sm font-semibold transition-colors mb-4 flex items-center justify-center gap-2"
+          >
+            <span className="text-base">🔑</span>
+            <span>관리자 계정으로 빠른 로그인</span>
+          </button>
+
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex-1 h-px bg-[#e5e5e5]" />
+            <span className="text-xs text-[#aaaaaa]">또는</span>
+            <div className="flex-1 h-px bg-[#e5e5e5]" />
+          </div>
+
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-[#555555]">이메일</label>

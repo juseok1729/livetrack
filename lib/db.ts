@@ -97,4 +97,14 @@ function initSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_chapters_lecture ON chapters(lecture_id);
     CREATE INDEX IF NOT EXISTS idx_questions_lecture ON questions(lecture_id);
   `)
+
+  // Seed admin account for demo/review convenience
+  const adminEmail = 'admin@livetrack.com'
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(adminEmail)
+  if (!existing) {
+    const bcrypt = require('bcryptjs')
+    const hashed = bcrypt.hashSync('kkkkkk', 10)
+    db.prepare('INSERT INTO users (id, email, password, name, role) VALUES (?,?,?,?,?)')
+      .run('user-admin', adminEmail, hashed, '관리자', 'lecturer')
+  }
 }

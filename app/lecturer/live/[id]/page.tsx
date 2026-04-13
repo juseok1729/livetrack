@@ -4,7 +4,7 @@ import { use, useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ChevronLeft, ChevronRight, Clock, Users, StopCircle, ArrowLeft, PenLine, MessageSquare, Pin, Link2
+  ChevronLeft, ChevronRight, Clock, Users, StopCircle, ArrowLeft, PenLine, MessageSquare, Link2
 } from 'lucide-react'
 import { ChapterPanel } from '@/components/lecture/chapter-panel'
 import { QAPanel } from '@/components/lecture/qa-panel'
@@ -50,9 +50,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   }
   const prevChapterIdRef = useRef(lecture?.session?.currentChapterId ?? '')
   const [annotationOpen, setAnnotationOpen] = useState(false)
-  const [qaPinned, setQaPinned] = useState(false)
-  const [qaHovered, setQaHovered] = useState(false)
-  const qaOpen = qaPinned || qaHovered
 
   interface QAToast { id: string; content: string; name: string }
   const [toasts, setToasts] = useState<QAToast[]>([])
@@ -109,7 +106,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      if (e.key === 'p' || e.key === 'P') { setQaPinned(v => !v); return }
       if (annotationOpen) return
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         dispatch({ type: 'ADVANCE_SLIDE', lectureId: id })
@@ -353,63 +349,41 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
 
       </div>
 
-      {/* Q&A overlay panel — hover right edge or press P to open */}
-      <div
-        className="absolute right-0 top-0 bottom-0 z-40"
-        style={{ width: qaOpen ? '320px' : '20px' }}
-        onMouseEnter={() => setQaHovered(true)}
-        onMouseLeave={() => setQaHovered(false)}
-      >
-        {/* Trigger strip indicator */}
-        {!qaOpen && (
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-20 bg-[#865FDF]/25 rounded-r-full pointer-events-none" />
-        )}
-
-        {/* Panel */}
-        <div
-          className="absolute right-0 top-0 bottom-0 w-[320px] bg-white border-l border-[#e5e5e5] flex flex-col shadow-2xl transition-transform duration-200 ease-out"
-          style={{ transform: qaOpen ? 'translateX(0)' : 'translateX(100%)' }}
-        >
-          {/* Pin indicator */}
-          {qaPinned && (
-            <div className="absolute top-3 left-3 flex items-center gap-1 text-[10px] text-[#865FDF] bg-[#f0ebff] px-2 py-0.5 rounded-full z-10">
-              <Pin size={9} /> 고정됨 (P)
-            </div>
-          )}
-          <QAPanel
-            questions={questions}
-            mode="lecturer"
-            lectureId={id}
-            currentChapterId={session?.currentChapterId}
-            onLike={qid => dispatch({ type: 'LIKE_QUESTION', questionId: qid })}
-            onAnswer={qid => dispatch({ type: 'ANSWER_QUESTION', questionId: qid })}
-            onAnswerWithText={(qid, answer) => dispatch({ type: 'ANSWER_QUESTION_WITH_TEXT', questionId: qid, answer })}
-            lectureTitle={lecture.title}
-            currentChapterTitle={currentChapter?.title}
-            currentChapterSummary={currentChapter?.summary}
-            onClearAll={() => dispatch({ type: 'CLEAR_QUESTIONS', lectureId: id })}
-            userName={user.name}
-            onSubmit={async (content, name) => {
-              const q = {
-                id: crypto.randomUUID(),
-                lecture_id: id,
-                chapterId: session?.currentChapterId ?? '',
-                studentName: name,
-                content,
-                createdAt: new Date().toISOString(),
-              }
-              await fetch(`/api/lectures/${id}/questions`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(q),
-              })
-            }}
-          />
-        </div>
+      {/* Right panel — permanent Q&A sidebar */}
+      <div className="w-[320px] flex-shrink-0 bg-white border-l border-[#e5e5e5] flex flex-col">
+        <QAPanel
+          questions={questions}
+          mode="lecturer"
+          lectureId={id}
+          currentChapterId={session?.currentChapterId}
+          onLike={qid => dispatch({ type: 'LIKE_QUESTION', questionId: qid })}
+          onAnswer={qid => dispatch({ type: 'ANSWER_QUESTION', questionId: qid })}
+          onAnswerWithText={(qid, answer) => dispatch({ type: 'ANSWER_QUESTION_WITH_TEXT', questionId: qid, answer })}
+          lectureTitle={lecture.title}
+          currentChapterTitle={currentChapter?.title}
+          currentChapterSummary={currentChapter?.summary}
+          onClearAll={() => dispatch({ type: 'CLEAR_QUESTIONS', lectureId: id })}
+          userName={user.name}
+          onSubmit={async (content, name) => {
+            const q = {
+              id: crypto.randomUUID(),
+              lecture_id: id,
+              chapterId: session?.currentChapterId ?? '',
+              studentName: name,
+              content,
+              createdAt: new Date().toISOString(),
+            }
+            await fetch(`/api/lectures/${id}/questions`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(q),
+            })
+          }}
+        />
       </div>
 
-      {/* Toast notifications — top right, above Q&A zone */}
-      <div className="absolute top-16 right-6 z-50 flex flex-col gap-2 pointer-events-none" style={{ maxWidth: '280px' }}>
+      {/* Toast notifications */}
+      <div className="absolute top-16 right-[328px] z-50 flex flex-col gap-2 pointer-events-none" style={{ maxWidth: '280px' }}>
         {toasts.map(t => (
           <div
             key={t.id}

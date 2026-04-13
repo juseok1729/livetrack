@@ -161,15 +161,17 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     return () => clearInterval(t)
   }, [nickname, lecture?.id, fetchQuestions])
 
-  // Presence registration
+  // Presence registration + heartbeat every 20s (re-registers if server restarts)
   useEffect(() => {
     if (!nickname || !lecture?.id) return
     const lectureId = lecture.id
-    fetch(`/api/lectures/${lectureId}/presence`, {
+    const register = () => fetch(`/api/lectures/${lectureId}/presence`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nickname }),
     }).catch(() => {})
+    register()
+    const heartbeat = setInterval(register, 20000)
     const unregister = () => {
       fetch(`/api/lectures/${lectureId}/presence`, {
         method: 'DELETE',
@@ -180,6 +182,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     }
     window.addEventListener('beforeunload', unregister)
     return () => {
+      clearInterval(heartbeat)
       window.removeEventListener('beforeunload', unregister)
       fetch(`/api/lectures/${lectureId}/presence`, {
         method: 'DELETE',

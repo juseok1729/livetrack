@@ -482,29 +482,18 @@ function UsersTab({ questions, lectureId }: { questions: Question[]; lectureId?:
           {users.map(name => {
             const hasCamera = activeCameras.includes(name)
             return (
-              <div key={name} className="border-b border-[#f3f3f3] last:border-0">
-                {hasCamera ? (
-                  /* Camera-on: show avatar + name above, video tile below */
-                  <div className="py-3 px-1">
-                    <div className="flex items-center gap-2.5 mb-2">
-                      <div className="w-7 h-7 rounded-full bg-[#865FDF]/10 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-semibold text-[#865FDF]">{name[0]}</span>
-                      </div>
-                      <span className="text-sm font-medium text-[#111111]">{name}</span>
-                    </div>
-                    {lectureId && (
-                      <StudentCamViewer lectureId={lectureId} nickname={name} mediamtxUrl={mediamtxUrl} />
-                    )}
+              <div key={name} className="flex items-center gap-2.5 py-2.5 px-1 border-b border-[#f3f3f3] last:border-0">
+                <div className="w-7 h-7 rounded-full bg-[#865FDF]/10 flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-semibold text-[#865FDF]">{name[0]}</span>
+                </div>
+                <span className="text-sm text-[#111111] flex-1 truncate">{name}</span>
+                {hasCamera && lectureId ? (
+                  /* Camera-on: small inline thumbnail on the right */
+                  <div className="w-20 aspect-video rounded-lg overflow-hidden flex-shrink-0 bg-black border border-[#e5e5e5]">
+                    <StudentCamViewer lectureId={lectureId} nickname={name} mediamtxUrl={mediamtxUrl} />
                   </div>
                 ) : (
-                  /* Camera-off: compact single row */
-                  <div className="flex items-center gap-2.5 py-3 px-1">
-                    <div className="w-7 h-7 rounded-full bg-[#865FDF]/10 flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs font-semibold text-[#865FDF]">{name[0]}</span>
-                    </div>
-                    <span className="text-sm text-[#111111]">{name}</span>
-                    <VideoOff size={15} className="ml-auto text-[#cccccc]" />
-                  </div>
+                  <VideoOff size={14} className="flex-shrink-0 text-[#cccccc]" />
                 )}
               </div>
             )

@@ -1,7 +1,8 @@
 'use client'
 
 // Basic PPTX → canvas renderer using jszip + XML parsing.
-// Handles: background fills (solid + scheme), text shapes, embedded images.
+// Handles: background fills (solid + scheme), text shapes, embedded images,
+//          group shapes (grpSp), tables (graphicFrame), shape borders (a:ln).
 
 import type { PageText } from './pdf-parser'
 
@@ -124,6 +125,235 @@ function resolveFill(spPr: Element | null, style: Element | null, themeColors: R
   return null
 }
 
+// ── Shape renderer (recursive, handles sp / pic / grpSp / graphicFrame) ──────
+
+async function renderShape(
+  ctx: CanvasRenderingContext2D,
+  shapeEl: Element,
+  themeColors: Record<string, string>,
+  relMap: Record<string, string>,
+  slideW: number,
+  slideH: number,
+  cw: number,
+  ch: number,
+  SCALE: number,
+  textParts: string[],
+): Promise<void> {
+  const tag = shapeEl.localName
+
+  // ── Picture ────────────────────────────────────────────────────────────────
+  if (tag === 'pic') {
+    const blip = shapeEl.querySelector('blip')
+    const rId = blip?.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'embed')
+      ?? blip?.getAttribute('r:embed') ?? ''
+    const dataUrl = relMap[rId]
+    const xfrm = shapeEl.querySelector('spPr xfrm') ?? shapeEl.querySelector('xfrm')
+    if (!dataUrl || !xfrm) return
+    const x = emuToFraction(xfrm.querySelector('off')?.getAttribute('x') ?? null, slideW) * cw
+    const y = emuToFraction(xfrm.querySelector('off')?.getAttribute('y') ?? null, slideH) * ch
+    const w = emuToFraction(xfrm.querySelector('ext')?.getAttribute('cx') ?? null, slideW) * cw
+    const h = emuToFraction(xfrm.querySelector('ext')?.getAttribute('cy') ?? null, slideH) * ch
+    await new Promise<void>(resolve => {
+      const img = new Image()
+      img.onload = () => { ctx.drawImage(img, x, y, w, h); resolve() }
+      img.onerror = () => resolve()
+      img.src = dataUrl
+    })
+    return
+  }
+
+  // ── Group shape — recurse into children ────────────────────────────────────
+  if (tag === 'grpSp') {
+    for (const child of Array.from(shapeEl.children)) {
+      const childTag = child.localName
+      if (childTag === 'sp' || childTag === 'pic' || childTag === 'grpSp' || childTag === 'graphicFrame') {
+        await renderShape(ctx, child, themeColors, relMap, slideW, slideH, cw, ch, SCALE, textParts)
+      }
+    }
+    return
+  }
+
+  // ── Graphic frame (tables) ──────────────────────────────────────────────────
+  if (tag === 'graphicFrame') {
+    const tbl = shapeEl.querySelector('tbl')
+    if (!tbl) return
+
+    // Get the frame position/size from xfrm
+    const xfrm = shapeEl.querySelector('xfrm')
+    const frameX = xfrm ? emuToFraction(xfrm.querySelector('off')?.getAttribute('x') ?? null, slideW) * cw : 0
+    const frameY = xfrm ? emuToFraction(xfrm.querySelector('off')?.getAttribute('y') ?? null, slideH) * ch : 0
+    const frameW = xfrm ? (emuToFraction(xfrm.querySelector('ext')?.getAttribute('cx') ?? null, slideW) * cw || cw) : cw
+    const frameH = xfrm ? (emuToFraction(xfrm.querySelector('ext')?.getAttribute('cy') ?? null, slideH) * ch || ch) : ch
+
+    const rows = Array.from(tbl.querySelectorAll('tr'))
+    if (rows.length === 0) return
+    const rowCount = rows.length
+    const colCount = rows.reduce((max, row) => Math.max(max, row.querySelectorAll('tc').length), 0)
+    if (colCount === 0) return
+
+    const cellH = frameH / rowCount
+    const cellW = frameW / colCount
+
+    for (let ri = 0; ri < rows.length; ri++) {
+      const cells = Array.from(rows[ri].querySelectorAll('tc'))
+      for (let ci = 0; ci < cells.length; ci++) {
+        const cell = cells[ci]
+        const cx = frameX + ci * cellW
+        const cy = frameY + ri * cellH
+
+        // Cell fill from tcPr
+        const tcPr = cell.querySelector('tcPr')
+        const cellSolidFill = tcPr?.querySelector('solidFill') ?? null
+        const cellFill = cellSolidFill ? resolveColor(cellSolidFill, themeColors) : null
+        if (cellFill && cellFill !== 'transparent') {
+          ctx.fillStyle = cellFill
+          ctx.fillRect(cx, cy, cellW, cellH)
+        }
+
+        // Cell border — draw rect outline
+        ctx.strokeStyle = '#cccccc'
+        ctx.lineWidth = 0.5 * SCALE
+        ctx.strokeRect(cx, cy, cellW, cellH)
+
+        // Cell text
+        const cellTxBody = cell.querySelector('txBody')
+        if (!cellTxBody) continue
+
+        let lineY = cy + 4 * SCALE
+        for (const para of Array.from(cellTxBody.querySelectorAll('p'))) {
+          const runs = Array.from(para.querySelectorAll('r'))
+          if (runs.length === 0) { lineY += 10 * SCALE; continue }
+          const fullText = runs.map(r => r.querySelector('t')?.textContent ?? '').join('')
+          if (!fullText.trim()) { lineY += 8 * SCALE; continue }
+          textParts.push(fullText)
+
+          const rPr = runs[0].querySelector('rPr')
+          const defRPr = para.querySelector('pPr defRPr') ?? cellTxBody.querySelector('lstStyle defPPr defRPr')
+          const szRaw = rPr?.getAttribute('sz') ?? defRPr?.getAttribute('sz') ?? null
+          const ptSize = szRaw ? parseInt(szRaw) / 100 : 14
+          const px = Math.max(7, Math.min(ptSize * SCALE * 1.2, cellW / 3))
+
+          let textColor = resolveColor(rPr?.querySelector('solidFill') ?? null, themeColors)
+            ?? resolveColor(defRPr?.querySelector('solidFill') ?? null, themeColors)
+            ?? (cellFill && isLight(cellFill) ? '#111111' : cellFill ? '#ffffff' : '#111111')
+          // Invisible white text on transparent background — use dark fallback
+          if (textColor === '#ffffff' && (!cellFill || cellFill === 'transparent')) {
+            textColor = '#111111'
+          }
+
+          const bold = rPr?.getAttribute('b') === '1' || defRPr?.getAttribute('b') === '1'
+          ctx.font = `${bold ? 'bold ' : ''}${px}px sans-serif`
+          ctx.fillStyle = textColor
+          ctx.textBaseline = 'top'
+          ctx.textAlign = 'left'
+
+          // Simple text draw clipped to cell width
+          const inset = 4 * SCALE
+          ctx.fillText(fullText, cx + inset, lineY, cellW - inset * 2)
+          lineY += px * 1.4
+        }
+      }
+    }
+    return
+  }
+
+  // ── Shape (sp) ─────────────────────────────────────────────────────────────
+  if (tag !== 'sp') return
+
+  const txBody = shapeEl.querySelector('txBody')
+  const spPr = shapeEl.querySelector('spPr')
+  const style = shapeEl.querySelector('style')
+
+  const xfrm = spPr?.querySelector('xfrm')
+  let sx = 0, sy = 0, sw = cw, sh = ch
+  if (xfrm) {
+    sx = emuToFraction(xfrm.querySelector('off')?.getAttribute('x') ?? null, slideW) * cw
+    sy = emuToFraction(xfrm.querySelector('off')?.getAttribute('y') ?? null, slideH) * ch
+    sw = emuToFraction(xfrm.querySelector('ext')?.getAttribute('cx') ?? null, slideW) * cw || cw
+    sh = emuToFraction(xfrm.querySelector('ext')?.getAttribute('cy') ?? null, slideH) * ch || ch
+  }
+
+  // Shape fill
+  const fill = resolveFill(spPr ?? null, style ?? null, themeColors)
+  if (fill && fill !== 'transparent') {
+    ctx.fillStyle = fill
+    ctx.fillRect(sx, sy, sw, sh)
+  }
+
+  // Shape border (a:ln)
+  const lnEl = spPr?.querySelector('ln') ?? null
+  if (lnEl) {
+    const lnSolidFill = lnEl.querySelector('solidFill')
+    const borderColor = lnSolidFill ? resolveColor(lnSolidFill, themeColors) : null
+    if (borderColor && borderColor !== 'transparent') {
+      const wEmu = parseInt(lnEl.getAttribute('w') ?? '0')
+      const lineWidth = wEmu > 0 ? (wEmu / 12700) * SCALE : 1 * SCALE
+      ctx.strokeStyle = borderColor
+      ctx.lineWidth = lineWidth
+      ctx.strokeRect(sx, sy, sw, sh)
+    }
+  }
+
+  if (!txBody) return
+
+  // Text rendering
+  let lineY = sy + Math.max(4, sh * 0.08)
+  const bodyPr = txBody.querySelector('bodyPr')
+  const anchor = bodyPr?.getAttribute('anchor') ?? 't'
+  if (anchor === 'ctr') lineY = sy + sh * 0.3
+  if (anchor === 'b') lineY = sy + sh * 0.7
+
+  const insetL = parseInt(bodyPr?.getAttribute('lIns') ?? '91440') / slideW * cw
+  const insetR = parseInt(bodyPr?.getAttribute('rIns') ?? '91440') / slideW * cw
+  const textW = sw - insetL - insetR
+
+  for (const para of Array.from(txBody.querySelectorAll('p'))) {
+    const runs = Array.from(para.querySelectorAll('r'))
+    if (runs.length === 0) { lineY += 12 * SCALE; continue }
+
+    const fullText = runs.map(r => r.querySelector('t')?.textContent ?? '').join('')
+    if (!fullText.trim()) { lineY += 8 * SCALE; continue }
+    textParts.push(fullText)
+
+    // Font size — check run rPr, then defRPr, then txBody default
+    const rPr = runs[0].querySelector('rPr')
+    const defRPr = para.querySelector('pPr defRPr') ?? txBody.querySelector('lstStyle defPPr defRPr')
+    const szRaw = rPr?.getAttribute('sz') ?? defRPr?.getAttribute('sz') ?? null
+    const ptSize = szRaw ? parseInt(szRaw) / 100 : 18
+    const px = Math.max(8, Math.min(ptSize * SCALE * 1.2, textW / 3))
+
+    // Text color
+    let textColor = resolveColor(rPr?.querySelector('solidFill') ?? null, themeColors)
+      ?? resolveColor(defRPr?.querySelector('solidFill') ?? null, themeColors)
+      ?? (fill && isLight(fill) ? '#111111' : fill ? '#ffffff' : '#111111')
+
+    // Invisible white text on transparent/null background — use dark fallback
+    if (textColor === '#ffffff' && (!fill || fill === 'transparent')) {
+      textColor = '#111111'
+    }
+
+    const bold = rPr?.getAttribute('b') === '1' || defRPr?.getAttribute('b') === '1'
+    ctx.font = `${bold ? 'bold ' : ''}${px}px sans-serif`
+    ctx.fillStyle = textColor
+    ctx.textBaseline = 'top'
+
+    const algn = para.querySelector('pPr')?.getAttribute('algn') ?? 'l'
+    ctx.textAlign = algn === 'ctr' ? 'center' : algn === 'r' ? 'right' : 'left'
+    const textX = sx + insetL + (algn === 'ctr' ? textW / 2 : algn === 'r' ? textW : 0)
+
+    // Word-wrap
+    const words = fullText.split(' ')
+    let line = ''
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word
+      if (ctx.measureText(test).width > textW && line) {
+        ctx.fillText(line, textX, lineY); lineY += px * 1.3; line = word
+      } else { line = test }
+    }
+    if (line) { ctx.fillText(line, textX, lineY); lineY += px * 1.4 }
+  }
+}
+
 // ── main renderer ────────────────────────────────────────────────────────────
 
 export async function renderPptxSlides(file: File): Promise<PptxRenderResult> {
@@ -208,105 +438,11 @@ export async function renderPptxSlides(file: File): Promise<PptxRenderResult> {
     const spTree = doc.querySelector('spTree')
     if (!spTree) { pages.push({ pageNumber: i + 1, text: '' }); images.push(canvas.toDataURL('image/jpeg', 0.8)); ratios.push(ratio); continue }
 
-    // Draw all elements in DOM order (pictures and shapes together)
+    // Draw all elements in DOM order
     for (const child of Array.from(spTree.children)) {
       const tag = child.localName
-
-      // ── Picture ──────────────────────────────────────────────────────────
-      if (tag === 'pic') {
-        const blip = child.querySelector('blip')
-        const rId = blip?.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'embed')
-          ?? blip?.getAttribute('r:embed') ?? ''
-        const dataUrl = relMap[rId]
-        const xfrm = child.querySelector('spPr xfrm') ?? child.querySelector('xfrm')
-        if (!dataUrl || !xfrm) continue
-        const x = emuToFraction(xfrm.querySelector('off')?.getAttribute('x') ?? null, slideW) * cw
-        const y = emuToFraction(xfrm.querySelector('off')?.getAttribute('y') ?? null, slideH) * ch
-        const w = emuToFraction(xfrm.querySelector('ext')?.getAttribute('cx') ?? null, slideW) * cw
-        const h = emuToFraction(xfrm.querySelector('ext')?.getAttribute('cy') ?? null, slideH) * ch
-        await new Promise<void>(resolve => {
-          const img = new Image()
-          img.onload = () => { ctx.drawImage(img, x, y, w, h); resolve() }
-          img.onerror = () => resolve()
-          img.src = dataUrl
-        })
-        continue
-      }
-
-      // ── Shape ─────────────────────────────────────────────────────────────
-      if (tag !== 'sp') continue
-      const txBody = child.querySelector('txBody')
-      const spPr = child.querySelector('spPr')
-      const style = child.querySelector('style')
-
-      const xfrm = spPr?.querySelector('xfrm')
-      let sx = 0, sy = 0, sw = cw, sh = ch
-      if (xfrm) {
-        sx = emuToFraction(xfrm.querySelector('off')?.getAttribute('x') ?? null, slideW) * cw
-        sy = emuToFraction(xfrm.querySelector('off')?.getAttribute('y') ?? null, slideH) * ch
-        sw = emuToFraction(xfrm.querySelector('ext')?.getAttribute('cx') ?? null, slideW) * cw || cw
-        sh = emuToFraction(xfrm.querySelector('ext')?.getAttribute('cy') ?? null, slideH) * ch || ch
-      }
-
-      // Shape fill
-      const fill = resolveFill(spPr ?? null, style ?? null, themeColors)
-      if (fill && fill !== 'transparent') {
-        ctx.fillStyle = fill
-        ctx.fillRect(sx, sy, sw, sh)
-      }
-
-      if (!txBody) continue
-
-      // Text rendering
-      let lineY = sy + Math.max(4, sh * 0.08)
-      const bodyPr = txBody.querySelector('bodyPr')
-      const anchor = bodyPr?.getAttribute('anchor') ?? 't'
-      if (anchor === 'ctr') lineY = sy + sh * 0.3
-      if (anchor === 'b') lineY = sy + sh * 0.7
-
-      const insetL = parseInt(bodyPr?.getAttribute('lIns') ?? '91440') / slideW * cw
-      const insetR = parseInt(bodyPr?.getAttribute('rIns') ?? '91440') / slideW * cw
-      const textW = sw - insetL - insetR
-
-      for (const para of Array.from(txBody.querySelectorAll('p'))) {
-        const runs = Array.from(para.querySelectorAll('r'))
-        if (runs.length === 0) { lineY += 12 * SCALE; continue }
-
-        const fullText = runs.map(r => r.querySelector('t')?.textContent ?? '').join('')
-        if (!fullText.trim()) { lineY += 8 * SCALE; continue }
-        textParts.push(fullText)
-
-        // Font size — check run rPr, then defRPr, then txBody default
-        const rPr = runs[0].querySelector('rPr')
-        const defRPr = para.querySelector('pPr defRPr') ?? txBody.querySelector('lstStyle defPPr defRPr')
-        const szRaw = rPr?.getAttribute('sz') ?? defRPr?.getAttribute('sz') ?? null
-        const ptSize = szRaw ? parseInt(szRaw) / 100 : 18
-        const px = Math.max(8, Math.min(ptSize * SCALE * 1.2, textW / 3))
-
-        // Text color
-        const textColor = resolveColor(rPr?.querySelector('solidFill') ?? null, themeColors)
-          ?? resolveColor(defRPr?.querySelector('solidFill') ?? null, themeColors)
-          ?? (fill && isLight(fill) ? '#111111' : fill ? '#ffffff' : '#111111')
-
-        const bold = rPr?.getAttribute('b') === '1' || defRPr?.getAttribute('b') === '1'
-        ctx.font = `${bold ? 'bold ' : ''}${px}px sans-serif`
-        ctx.fillStyle = textColor
-        ctx.textBaseline = 'top'
-
-        const algn = para.querySelector('pPr')?.getAttribute('algn') ?? 'l'
-        ctx.textAlign = algn === 'ctr' ? 'center' : algn === 'r' ? 'right' : 'left'
-        const textX = sx + insetL + (algn === 'ctr' ? textW / 2 : algn === 'r' ? textW : 0)
-
-        // Word-wrap
-        const words = fullText.split(' ')
-        let line = ''
-        for (const word of words) {
-          const test = line ? `${line} ${word}` : word
-          if (ctx.measureText(test).width > textW && line) {
-            ctx.fillText(line, textX, lineY); lineY += px * 1.3; line = word
-          } else { line = test }
-        }
-        if (line) { ctx.fillText(line, textX, lineY); lineY += px * 1.4 }
+      if (tag === 'sp' || tag === 'pic' || tag === 'grpSp' || tag === 'graphicFrame') {
+        await renderShape(ctx, child, themeColors, relMap, slideW, slideH, cw, ch, SCALE, textParts)
       }
     }
 

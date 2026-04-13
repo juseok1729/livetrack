@@ -2,7 +2,7 @@
 
 import { use, useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { MessageSquare, BookOpen, Sparkles, ChevronRight, ChevronLeft, GraduationCap, ArrowRight, Monitor, GalleryHorizontalEnd } from 'lucide-react'
+import { MessageSquare, BookOpen, Sparkles, ChevronRight, ChevronLeft, GraduationCap, ArrowRight, Monitor, GalleryHorizontalEnd, LogOut, Video, VideoOff, Users } from 'lucide-react'
 import { ChapterPanel } from '@/components/lecture/chapter-panel'
 import { QAPanel } from '@/components/lecture/qa-panel'
 import { AISummaryCard } from '@/components/lecture/ai-summary-card'
@@ -12,7 +12,7 @@ import { StudentCamPublisher } from '@/components/lecture/student-cam-publisher'
 import { Badge } from '@/components/ui/badge'
 import type { Lecture, Question } from '@/lib/types'
 
-type Tab = 'chapters' | 'qa'
+type Tab = 'chapters' | 'qa' | 'users'
 const PANEL_KEY = 'eduflow_panel_open'
 const NICKNAME_KEY = 'livetrack_nickname'
 const POLL_INTERVAL = 2500
@@ -47,6 +47,9 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const likedIdsRef = useRef(likedIds)
   likedIdsRef.current = likedIds
+
+  const [presenceList, setPresenceList] = useState<string[]>([])
+  const [cameraList, setCameraList] = useState<{nickname: string; streamPath: string}[]>([])
 
   // Cleanup camera on unmount
   useEffect(() => {
@@ -216,6 +219,22 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
       } catch {}
     }
     return () => es.close()
+  }, [nickname, lecture?.id])
+
+  // Presence + camera polling for user list tab
+  useEffect(() => {
+    if (!nickname || !lecture?.id) return
+    const fetchUsers = async () => {
+      const [pRes, cRes] = await Promise.all([
+        fetch(`/api/lectures/${lecture.id}/presence`),
+        fetch(`/api/lectures/${lecture.id}/cameras`),
+      ])
+      if (pRes.ok) { const d = await pRes.json(); setPresenceList(d.participants ?? []) }
+      if (cRes.ok) { const d = await cRes.json(); setCameraList(d.cameras ?? []) }
+    }
+    fetchUsers()
+    const t = setInterval(fetchUsers, 3000)
+    return () => clearInterval(t)
   }, [nickname, lecture?.id])
 
   // Chapter change → AI summary
@@ -495,6 +514,30 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
             )}
             <span className="text-xs text-[#aaaaaa]">{session?.currentSlide}/{lecture.totalSlides} 슬라이드</span>
             <span className="text-xs text-[#aaaaaa] border-l border-[#e5e5e5] pl-3">{nickname}</span>
+            <button
+              onClick={() => {
+                activeStream?.getTracks().forEach(t => t.stop())
+                if (lecture?.id) {
+                  fetch(`/api/lectures/${lecture.id}/presence`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nickname }),
+                  }).catch(() => {})
+                  if (activeStream) {
+                    fetch(`/api/lectures/${lecture.id}/cameras`, {
+                      method: 'DELETE',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ nickname }),
+                    }).catch(() => {})
+                  }
+                }
+                router.push('/')
+              }}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg text-[#ef4444] border border-[#ef4444]/30 hover:bg-[#ef4444]/10 transition-colors"
+            >
+              <LogOut size={13} />
+              나가기
+            </button>
           </div>
         </div>
 
@@ -597,6 +640,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
             {([
               { key: 'chapters' as const, label: '챕터', icon: BookOpen },
               { key: 'qa' as const, label: `Q&A${unansweredCount > 0 ? ` (${unansweredCount})` : ''}`, icon: MessageSquare },
+              { key: 'users' as const, label: '유저', icon: Users },
             ]).map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
@@ -619,7 +663,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
                 mode="student"
                 startedAt={session?.startedAt}
               />
-            ) : (
+            ) : tab === 'qa' ? (
               <QAPanel
                 questions={questions}
                 mode="student"
@@ -629,6 +673,23 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
                 onSubmit={handleSubmitQuestion}
                 userName={nickname}
               />
+            ) : (
+              <div className="flex-1 overflow-y-auto px-3 py-3">
+                <p className="text-xs text-[#aaaaaa] px-2 mb-2">{presenceList.length}명 참여중</p>
+                {presenceList.map(name => {
+                  const hasCam = cameraList.some(c => c.nickname === name)
+                  const isMe = name === nickname
+                  return (
+                    <div key={name} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#f8f8f8]">
+                      <div className="w-8 h-8 rounded-full bg-[#865FDF]/15 flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-semibold text-[#865FDF]">{name[0]}</span>
+                      </div>
+                      <span className="text-sm text-[#111111] flex-1">{name}{isMe ? ' (나)' : ''}</span>
+                      {hasCam ? <Video size={14} className="text-[#865FDF]" /> : <VideoOff size={14} className="text-[#cccccc]" />}
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </div>
         </div>

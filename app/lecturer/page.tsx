@@ -28,6 +28,15 @@ export default function LecturerDashboard() {
     }
   }, [authLoading, user, router])
 
+  // Re-fetch lectures when the authenticated user arrives (fixes empty list on first navigation after login)
+  useEffect(() => {
+    if (!user) return
+    fetch('/api/lectures')
+      .then(r => r.ok ? r.json() : [])
+      .then((data: Lecture[]) => dispatch({ type: '_SYNC_LECTURES', lectures: data }))
+      .catch(() => {})
+  }, [user?.id, dispatch])
+
   if (authLoading || !user) return null
 
   const live = lectures.filter(l => l.status === 'live')

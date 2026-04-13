@@ -2,29 +2,33 @@
 
 import { use, useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { MessageSquare, BookOpen, Sparkles, ChevronRight, ChevronLeft } from 'lucide-react'
+import { MessageSquare, BookOpen, Sparkles, ChevronRight, ChevronLeft, GraduationCap, ArrowRight } from 'lucide-react'
 import { ChapterPanel } from '@/components/lecture/chapter-panel'
 import { QAPanel } from '@/components/lecture/qa-panel'
 import { AISummaryCard } from '@/components/lecture/ai-summary-card'
 import { StrokeOverlay } from '@/components/lecture/stroke-overlay'
 import { ScreenShareViewer } from '@/components/lecture/screen-share-viewer'
 import { Badge } from '@/components/ui/badge'
-import { useAuth } from '@/contexts/auth-context'
 import type { Lecture, Question } from '@/lib/types'
 
 type Tab = 'chapters' | 'qa'
 const PANEL_KEY = 'eduflow_panel_open'
-const POLL_INTERVAL = 2500       // questions
-const LECTURE_FALLBACK_MS = 10000 // lecture state fallback if SSE drops
+const NICKNAME_KEY = 'livetrack_nickname'
+const POLL_INTERVAL = 2500
+const LECTURE_FALLBACK_MS = 10000
 
 type StudentLecture = Lecture & { currentSlideImage?: string | null; currentStrokes?: string | null }
 
 export default function StudentJoinPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params)
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth()
+
+  // Nickname / lobby state
+  const [nickname, setNickname] = useState<string | null>(null)
+  const [nicknameInput, setNicknameInput] = useState('')
 
   const [lecture, setLecture] = useState<StudentLecture | null | undefined>(undefined)
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
   const [tab, setTab] = useState<Tab>('chapters')
   const [showSummary, setShowSummary] = useState(false)
@@ -38,17 +42,12 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
   const likedIdsRef = useRef(likedIds)
   likedIdsRef.current = likedIds
 
-  // Auth guard
+  // Restore saved nickname & panel state
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace(`/auth/login?redirect=/student/join/${code}`)
-    }
-  }, [authLoading, user, router, code])
-
-  // Restore panel state
-  useEffect(() => {
-    const saved = localStorage.getItem(PANEL_KEY)
-    if (saved !== null) setPanelOpen(saved === 'true')
+    const saved = localStorage.getItem(NICKNAME_KEY)
+    if (saved) setNicknameInput(saved)
+    const panel = localStorage.getItem(PANEL_KEY)
+    if (panel !== null) setPanelOpen(panel === 'true')
   }, [])
 
   function togglePanel() {
@@ -58,9 +57,14 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     })
   }
 
-  // Fetch lecture state (initial + fallback)
+  function handleEnter() {
+    const name = nicknameInput.trim() || '익명'
+    localStorage.setItem(NICKNAME_KEY, name)
+    setNickname(name)
+  }
+
+  // Fetch lecture state
   const fetchLecture = useCallback(async () => {
-    if (!user) return
     try {
       const res = await fetch(`/api/lectures/by-code/${code}`)
       if (!res.ok) { setLecture(null); return }
@@ -68,9 +72,9 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
       if (!data) { setLecture(null); return }
       setLecture(data)
     } catch {}
-  }, [user, code])
+  }, [code])
 
-  // Fetch questions (separate polling)
+  // Fetch questions
   const fetchQuestions = useCallback(async (lectureId: string) => {
     try {
       const qRes = await fetch(`/api/lectures/${lectureId}/questions`)
@@ -82,25 +86,33 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     } catch {}
   }, [])
 
-  // Initial load + fallback polling (10s)
+  // Fetch first slide thumbnail for lobby
   useEffect(() => {
-    if (!user) return
+    if (!lecture?.id || thumbnailUrl !== null) return
+    fetch(`/api/lectures/${lecture.id}/slides`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.images?.[0]) setThumbnailUrl(data.images[0]) })
+      .catch(() => {})
+  }, [lecture?.id, thumbnailUrl])
+
+  // Initial load + fallback polling
+  useEffect(() => {
     fetchLecture()
     const t = setInterval(fetchLecture, LECTURE_FALLBACK_MS)
     return () => clearInterval(t)
-  }, [user, fetchLecture])
+  }, [fetchLecture])
 
-  // Question polling (2.5s)
+  // Question polling (only after entering)
   useEffect(() => {
-    if (!user || !lecture?.id) return
+    if (!nickname || !lecture?.id) return
     fetchQuestions(lecture.id)
     const t = setInterval(() => fetchQuestions(lecture.id), POLL_INTERVAL)
     return () => clearInterval(t)
-  }, [user, lecture?.id, fetchQuestions])
+  }, [nickname, lecture?.id, fetchQuestions])
 
-  // SSE: real-time lecture state push from server
+  // SSE
   useEffect(() => {
-    if (!user || !lecture?.id) return
+    if (!nickname || !lecture?.id) return
     const es = new EventSource(`/api/lectures/${lecture.id}/stream`)
     es.onmessage = (e) => {
       try {
@@ -112,7 +124,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
           if (update.currentSlideImage !== undefined) next.currentSlideImage = update.currentSlideImage
           if (update.currentStrokes !== undefined) next.currentStrokes = update.currentStrokes
           if (update.screenSharing !== undefined) setScreenSharing(!!update.screenSharing)
-        if ((update.currentSlide !== undefined || update.currentChapterId !== undefined) && next.session) {
+          if ((update.currentSlide !== undefined || update.currentChapterId !== undefined) && next.session) {
             next.session = {
               ...next.session,
               ...(update.currentSlide !== undefined && { currentSlide: update.currentSlide }),
@@ -121,13 +133,12 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
           }
           return next
         })
-      } catch { /* ignore malformed events */ }
+      } catch {}
     }
-    // Browser auto-reconnects on error; no extra handling needed
     return () => es.close()
-  }, [user, lecture?.id])
+  }, [nickname, lecture?.id])
 
-  // Detect chapter change → show AI summary
+  // Chapter change → AI summary
   useEffect(() => {
     if (!lecture?.session) return
     const curr = lecture.session.currentChapterId
@@ -142,9 +153,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     prevChapterIdRef.current = curr
   }, [lecture?.session?.currentChapterId, lecture?.chapters, lecture?.session])
 
-  if (authLoading || !user) return null
-
-  // Loading
+  // ── Loading ──────────────────────────────────────────────────────────────
   if (lecture === undefined) {
     return (
       <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
@@ -153,7 +162,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     )
   }
 
-  // Not found
+  // ── Not found ────────────────────────────────────────────────────────────
   if (lecture === null) {
     return (
       <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
@@ -169,7 +178,76 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     )
   }
 
-  // Ended
+  // ── Lobby (nickname not set yet) ─────────────────────────────────────────
+  if (nickname === null) {
+    return (
+      <div className="min-h-screen bg-[#f3f0ff] flex items-center justify-center p-4">
+        <div className="w-full max-w-sm">
+          {/* Logo */}
+          <div className="flex items-center gap-2 justify-center mb-8">
+            <div className="w-8 h-8 rounded-lg bg-[#865FDF] flex items-center justify-center">
+              <GraduationCap size={16} className="text-white" />
+            </div>
+            <span className="font-semibold text-[#111111] text-base">LiveTrack</span>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-[#e5e5e5] shadow-sm overflow-hidden">
+            {/* Thumbnail */}
+            <div className="w-full aspect-video bg-[#0a0a0a] flex items-center justify-center overflow-hidden">
+              {thumbnailUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={thumbnailUrl} alt="강의 썸네일" className="w-full h-full object-contain" />
+              ) : (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-[#865FDF]/20 flex items-center justify-center">
+                    <Sparkles size={22} className="text-[#865FDF]" />
+                  </div>
+                  <p className="text-[#555555] text-xs">슬라이드 미리보기 없음</p>
+                </div>
+              )}
+            </div>
+
+            {/* Lecture info + nickname input */}
+            <div className="p-6">
+              <div className="mb-1">
+                {lecture.status === 'live' ? (
+                  <span className="inline-flex items-center gap-1.5 bg-[#22c55e] text-white text-[10px] font-bold px-2 py-0.5 rounded-full mb-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> LIVE
+                  </span>
+                ) : lecture.status === 'preparing' ? (
+                  <span className="inline-block bg-amber-100 text-amber-700 text-[10px] font-semibold px-2 py-0.5 rounded-full mb-2">준비 중</span>
+                ) : (
+                  <span className="inline-block bg-[#f3f3f3] text-[#aaaaaa] text-[10px] font-semibold px-2 py-0.5 rounded-full mb-2">종료됨</span>
+                )}
+              </div>
+              <h2 className="text-lg font-bold text-[#111111] mb-1">{lecture.title}</h2>
+              <p className="text-xs text-[#aaaaaa] mb-5">
+                {lecture.totalSlides}장 슬라이드 · {lecture.chapters.length}개 챕터
+              </p>
+
+              <label className="block text-xs font-medium text-[#555555] mb-1.5">닉네임</label>
+              <input
+                value={nicknameInput}
+                onChange={e => setNicknameInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && handleEnter()}
+                placeholder="강의에서 사용할 이름을 입력하세요"
+                className="w-full px-3.5 py-2.5 text-sm border border-[#e5e5e5] rounded-xl outline-none focus:border-[#865FDF] focus:ring-2 focus:ring-[#865FDF]/10 transition placeholder:text-[#cccccc] mb-4"
+                autoFocus
+              />
+              <button
+                onClick={handleEnter}
+                className="w-full flex items-center justify-center gap-2 bg-[#865FDF] hover:bg-[#7450cc] text-white font-semibold py-2.5 rounded-xl transition-colors"
+              >
+                강의 입장하기 <ArrowRight size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Ended ────────────────────────────────────────────────────────────────
   if (lecture.status === 'ended') {
     return (
       <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
@@ -185,7 +263,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     )
   }
 
-  // Waiting (preparing)
+  // ── Waiting (preparing) ───────────────────────────────────────────────────
   if (lecture.status === 'preparing') {
     return (
       <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
@@ -196,7 +274,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
               <Sparkles size={32} className="text-[#865FDF]" />
             </div>
           </div>
-          <h2 className="text-xl font-bold text-[#111111] mb-2">안녕하세요, {user.name}님.</h2>
+          <h2 className="text-xl font-bold text-[#111111] mb-2">안녕하세요, {nickname}님.</h2>
           <p className="text-base text-[#555555] mb-1">강의 시작을 기다리고 있어요</p>
           <p className="text-sm text-[#aaaaaa]">{lecture.title}</p>
           <div className="flex items-center justify-center gap-1.5 mt-6">
@@ -209,7 +287,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     )
   }
 
-  // Live view
+  // ── Live view ─────────────────────────────────────────────────────────────
   const session = lecture.session
   const currentChapter = lecture.chapters.find(c => c.id === session?.currentChapterId)
   const unansweredCount = questions.filter(q => !q.answered).length
@@ -270,7 +348,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
               </div>
             )}
             <span className="text-xs text-[#aaaaaa]">{session?.currentSlide}/{lecture.totalSlides} 슬라이드</span>
-            <span className="text-xs text-[#aaaaaa] border-l border-[#e5e5e5] pl-3">{user.name}</span>
+            <span className="text-xs text-[#aaaaaa] border-l border-[#e5e5e5] pl-3">{nickname}</span>
           </div>
         </div>
 
@@ -369,7 +447,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
                 currentChapterId={session?.currentChapterId}
                 onLike={handleLike}
                 onSubmit={handleSubmitQuestion}
-                userName={user.name}
+                userName={nickname}
               />
             )}
           </div>

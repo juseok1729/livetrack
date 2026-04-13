@@ -470,6 +470,22 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
     }).catch(console.error)
   }
 
+  async function toggleLiveCam() {
+    if (activeStream) {
+      // Turn off: stop tracks → StudentCamPublisher unmounts → unregisters camera
+      activeStream.getTracks().forEach(t => t.stop())
+      setActiveStream(null)
+    } else {
+      // Turn on: get new stream → StudentCamPublisher mounts → registers camera
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        setActiveStream(stream)
+      } catch {
+        // Permission denied or no camera — silently ignore
+      }
+    }
+  }
+
   function handleSubmitQuestion(content: string, name: string) {
     if (!lecture) return
     const q: Question = {
@@ -516,6 +532,19 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
               </div>
             )}
             <span className="text-xs text-[#aaaaaa]">{session?.currentSlide}/{lecture.totalSlides} 슬라이드</span>
+            {/* Camera toggle */}
+            <button
+              onClick={toggleLiveCam}
+              title={activeStream ? '캠 끄기' : '캠 켜기'}
+              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors
+                ${activeStream
+                  ? 'border-[#865FDF] text-[#865FDF] bg-[#f0ebff]'
+                  : 'border-[#e5e5e5] text-[#aaaaaa] hover:border-[#865FDF] hover:text-[#865FDF]'
+                }`}
+            >
+              {activeStream ? <Video size={13} /> : <VideoOff size={13} />}
+              {activeStream ? '캠 ON' : '캠 OFF'}
+            </button>
             <span className="text-xs text-[#aaaaaa] border-l border-[#e5e5e5] pl-3">{nickname}</span>
             <button
               onClick={() => {

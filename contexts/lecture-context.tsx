@@ -19,6 +19,7 @@ type LectureAction =
   | { type: 'UPDATE_TOTAL_SLIDES'; lectureId: string; totalSlides: number }
   | { type: 'ADVANCE_SLIDE'; lectureId: string }
   | { type: 'PREV_SLIDE'; lectureId: string }
+  | { type: 'GOTO_SLIDE'; lectureId: string; slide: number }
   | { type: 'UPDATE_CHAPTERS'; lectureId: string; chapters: Chapter[] }
   | { type: 'UPDATE_TITLE'; lectureId: string; title: string }
   | { type: 'ADD_QUESTION'; question: Question }
@@ -97,6 +98,26 @@ function reducer(state: LectureState, action: LectureAction): LectureState {
           const chapter = lec.chapters.find(c => prev >= c.slideRange[0] && prev <= c.slideRange[1])
           const newChapterId = chapter?.id ?? lec.session.currentChapterId
           return { ...lec, session: { ...lec.session, currentSlide: prev, currentChapterId: newChapterId } }
+        }),
+      }
+    }
+
+    case 'GOTO_SLIDE': {
+      return {
+        ...state,
+        lectures: state.lectures.map(lec => {
+          if (lec.id !== action.lectureId || !lec.session) return lec
+          const target = Math.min(Math.max(1, action.slide), lec.totalSlides)
+          const chapter = lec.chapters.find(c => target >= c.slideRange[0] && target <= c.slideRange[1])
+          const newChapterId = chapter?.id ?? lec.session.currentChapterId
+          const chapterChanged = newChapterId !== lec.session.currentChapterId
+          const updatedChapters = chapterChanged
+            ? lec.chapters.map(c => ({
+                ...c,
+                status: (c.id === newChapterId ? 'active' : c.order < (chapter?.order ?? 0) ? 'completed' : 'pending') as Chapter['status'],
+              }))
+            : lec.chapters
+          return { ...lec, chapters: updatedChapters, session: { ...lec.session, currentSlide: target, currentChapterId: newChapterId } }
         }),
       }
     }
@@ -317,7 +338,8 @@ export function LectureProvider({ children }: { children: React.ReactNode }) {
           break
 
         case 'ADVANCE_SLIDE':
-        case 'PREV_SLIDE': {
+        case 'PREV_SLIDE':
+        case 'GOTO_SLIDE': {
           // stateRef is already updated because we update it synchronously above
           setTimeout(async () => {
             const lec = stateRef.current.lectures.find(l => l.id === action.lectureId)

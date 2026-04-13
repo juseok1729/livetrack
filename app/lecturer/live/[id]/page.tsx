@@ -4,7 +4,7 @@ import { use, useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ChevronLeft, ChevronRight, Clock, Users, StopCircle, ArrowLeft, PenLine, MessageSquare, Link2
+  Clock, Users, StopCircle, ArrowLeft, PenLine, MessageSquare, Link2, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { ChapterPanel } from '@/components/lecture/chapter-panel'
 import { QAPanel } from '@/components/lecture/qa-panel'
@@ -219,45 +219,40 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
           </p>
         </div>
 
-        {/* Current chapter */}
-        <div className="px-4 py-4 border-b border-[#2a2a2a]">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-[#555555] mb-2">현재 챕터</p>
-          <p className="text-white text-sm font-medium leading-tight">{currentChapter?.title ?? '—'}</p>
-          <p className="text-[#555555] text-xs mt-1">
-            {currentChapter && `슬라이드 ${currentChapter.slideRange[0]}–${currentChapter.slideRange[1]}장`}
-          </p>
-        </div>
-
-        {/* Slide navigation */}
-        <div className="px-4 py-4 border-b border-[#2a2a2a]">
-          {/* Slide thumbnail */}
-          <div className="w-full aspect-video bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] overflow-hidden mb-3 flex items-center justify-center">
-            {currentSlideImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={currentSlideImage} alt="" className="w-full h-full object-contain" />
-            ) : (
-              <span className="text-[#555555] text-xs">슬라이드 {session?.currentSlide}</span>
-            )}
+        {/* Chapter thumbnail navigator */}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-[#555555] px-4 pt-4 pb-2">챕터</p>
+          <div className="overflow-y-auto flex-1 px-3 pb-3 flex flex-col gap-3">
+            {lecture.chapters.map((chapter, idx) => {
+              const isActive = chapter.id === session?.currentChapterId
+              const chapterSlides = getSlides(id)
+              const thumbnailImage = chapterSlides ? chapterSlides[chapter.slideRange[0] - 1] : undefined
+              return (
+                <button
+                  key={chapter.id}
+                  onClick={() => dispatch({ type: 'GOTO_SLIDE', lectureId: id, slide: chapter.slideRange[0] })}
+                  className={`w-full text-left rounded-lg overflow-hidden transition-all ${
+                    isActive
+                      ? 'border-2 border-[#ff4488]'
+                      : 'border border-[#2a2a2a] hover:border-[#555555]'
+                  }`}
+                >
+                  <p className={`text-[10px] px-2 pt-1.5 pb-1 font-medium ${isActive ? 'text-[#ff4488]' : 'text-[#555555]'}`}>
+                    챕터{idx + 1}
+                  </p>
+                  <div className="w-full aspect-video bg-[#1a1a1a] flex items-center justify-center overflow-hidden">
+                    {thumbnailImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={thumbnailImage} alt="" className="w-full h-full object-contain" />
+                    ) : (
+                      <span className="text-[#444444] text-[10px]">슬라이드 {chapter.slideRange[0]}</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-[#666666] px-2 py-1.5 truncate">{chapter.title}</p>
+                </button>
+              )
+            })}
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => dispatch({ type: 'PREV_SLIDE', lectureId: id })}
-              disabled={session?.currentSlide === 1}
-              className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border border-[#2a2a2a] text-[#a0a0a0] hover:text-white hover:border-[#555555] disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs"
-            >
-              <ChevronLeft size={14} /> 이전
-            </button>
-            <button
-              onClick={() => dispatch({ type: 'ADVANCE_SLIDE', lectureId: id })}
-              disabled={session?.currentSlide === lecture.totalSlides}
-              className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-[#865FDF] hover:bg-[#7450cc] text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs"
-            >
-              다음 <ChevronRight size={14} />
-            </button>
-          </div>
-          <p className="text-[10px] text-[#555555] text-center mt-2">
-            ← → 키보드로도 이동 가능
-          </p>
         </div>
 
         {/* End lecture */}

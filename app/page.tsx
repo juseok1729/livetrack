@@ -1,17 +1,15 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { GraduationCap, Sparkles, BookOpen, MessageSquare, BarChart3, ArrowRight, MonitorPlay, LogIn } from 'lucide-react'
+import { GraduationCap, Sparkles, BookOpen, MessageSquare, LogIn } from 'lucide-react'
 import { useAuth } from '@/contexts/auth-context'
 import { useLecture } from '@/contexts/lecture-context'
 import type { Lecture } from '@/lib/types'
 
 const features = [
-  { icon: Sparkles,    title: 'AI 챕터 자동 생성', desc: 'PPT/PDF를 업로드하면\nAI가 자동으로 챕터를 제안합니다' },
-  { icon: BookOpen,    title: '실시간 챕터 패널',   desc: '수강생이 항상 강의 어디쯤\n있는지 한눈에 볼 수 있습니다' },
-  { icon: MessageSquare, title: '중요 질문 유실 방지', desc: '좋아요 기반 질문 정렬로\n중요한 질문을 놓치지 않습니다' },
-  { icon: BarChart3,   title: '다음 강의 개선 피드백', desc: '챕터별 진행 시간과\n집중도 변화를 자동으로 정리합니다' },
+  { icon: Sparkles,       title: 'AI 챕터 자동 생성' },
+  { icon: BookOpen,       title: '실시간 챕터 현황 및 AI 요약' },
+  { icon: MessageSquare,  title: 'AI 질문 요약' },
 ]
 
 function generateCode(): string {
@@ -43,9 +41,9 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col">
+    <div className="min-h-screen bg-gradient-to-b from-[#1a1040] via-[#2d1b69] to-[#3d2b8a] text-white flex flex-col">
       {/* Nav */}
-      <nav className="flex items-center justify-between px-8 py-4 border-b border-[#1e1e1e]">
+      <nav className="flex items-center justify-between px-8 py-4">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-[#865FDF] flex items-center justify-center">
             <GraduationCap size={16} className="text-white" />
@@ -56,16 +54,16 @@ export default function HomePage() {
         <div className="flex items-center gap-3">
           {user ? (
             <>
-              <span className="text-sm text-[#a0a0a0]">{user.name}</span>
-              <button
-                onClick={logout}
-                className="text-xs text-[#555555] hover:text-[#a0a0a0] transition-colors px-2 py-1"
-              >
-                로그아웃
-              </button>
               <div className="w-8 h-8 rounded-full bg-[#865FDF] flex items-center justify-center cursor-default">
                 <span className="text-sm font-semibold text-white">{user.name[0]}</span>
               </div>
+              <span className="text-sm text-white/80">{user.name}</span>
+              <button
+                onClick={logout}
+                className="text-xs text-white/60 hover:text-white/90 transition-colors px-2 py-1"
+              >
+                로그아웃
+              </button>
             </>
           ) : (
             <button
@@ -80,61 +78,47 @@ export default function HomePage() {
       </nav>
 
       {/* Hero */}
-      <section className="flex-1 flex flex-col items-center justify-center text-center px-8 py-24">
-        <div className="inline-flex items-center gap-2 bg-[#865FDF]/10 border border-[#865FDF]/20 rounded-full px-4 py-1.5 mb-8">
-          <Sparkles size={12} className="text-[#865FDF]" />
-          <span className="text-xs text-[#c4aff5]">AI 기반 강의 준비 플랫폼</span>
-          <MonitorPlay size={12} className="text-[#865FDF]" />
-        </div>
-
-        <h1 className="text-5xl font-bold leading-tight max-w-2xl mb-6">
-          온라인 강의의{' '}
-          <span className="text-[#865FDF]">맥락을 연결</span>하세요
+      <section className="flex-1 flex flex-col items-center justify-center text-center px-8 py-20">
+        <h1 className="text-5xl font-bold leading-tight mb-4">
+          실시간 강의, 운영은 AI에 맡기고<br />
+          수업에만 집중하세요
         </h1>
 
-        <p className="text-[#a0a0a0] text-lg max-w-xl leading-relaxed mb-10">
-          강의자와 수강생 사이의 인지 단절을 AI로 해결합니다.
-          챕터 자동 생성부터 실시간 Q&A, 강의 후 리포트까지.
+        <p className="text-white/60 text-base max-w-lg leading-relaxed mb-10">
+          자료만 올리면, AI가 강의의 흐름에 맞춰 챕터를 구성하고 실시간 질답을 정리합니다.<br />
+          번거로운 운영은 맡기고, 수강생과의 연결에 집중하세요.
         </p>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 mb-16">
           <button
             onClick={handleLectureList}
-            className="px-7 py-3 rounded-xl border border-[#3a3a3a] hover:border-[#865FDF]/60 text-white font-semibold transition-colors"
+            className="px-7 py-3 rounded-xl border border-white/60 hover:border-white text-white font-semibold transition-colors"
           >
             예정된 강의
           </button>
           <button
             onClick={handleCreateLecture}
-            className="flex items-center gap-2 bg-[#865FDF] hover:bg-[#7450cc] text-white font-semibold px-7 py-3 rounded-xl transition-colors"
+            className="px-7 py-3 rounded-xl border border-white/60 hover:border-white text-white font-semibold transition-colors"
           >
-            강의 만들기 <ArrowRight size={16} />
+            강의 만들기 →
           </button>
         </div>
-      </section>
 
-      {/* Feature cards */}
-      <section className="px-8 pb-20">
-        <div className="max-w-4xl mx-auto grid grid-cols-4 gap-4">
-          {features.map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="p-5 border border-[#1e1e1e] rounded-2xl bg-[#0f0f0f] hover:border-[#865FDF]/30 transition-colors">
-              <div className="w-9 h-9 rounded-xl bg-[#865FDF]/10 flex items-center justify-center mb-3">
-                <Icon size={16} className="text-[#865FDF]" />
+        {/* Feature cards */}
+        <div className="w-full max-w-4xl grid grid-cols-3 gap-5">
+          {features.map(({ icon: Icon, title }) => (
+            <div key={title} className="bg-white rounded-2xl shadow-lg overflow-hidden" style={{ height: '300px' }}>
+              {/* Card header */}
+              <div className="flex items-center gap-2 px-5 pt-5 pb-3">
+                <Icon size={18} className="text-[#865FDF]" />
+                <h3 className="font-semibold text-sm text-gray-800">{title}</h3>
               </div>
-              <h3 className="font-semibold text-sm mb-1.5">{title}</h3>
-              <p className="text-xs text-[#555555] leading-relaxed whitespace-pre-line">{desc}</p>
+              {/* Placeholder mockup area */}
+              <div className="mx-4 mb-4 rounded-xl bg-[#f3f3f3]" style={{ height: '200px' }} />
             </div>
           ))}
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="border-t border-[#1e1e1e] px-8 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4 text-xs text-[#444444]">
-          <span>서비스 이용약관</span>
-          <span>개인정보처리방침</span>
-        </div>
-      </footer>
     </div>
   )
 }

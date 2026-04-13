@@ -234,7 +234,7 @@ export default function PreparePage({ params }: { params: Promise<{ id: string }
           <p className="text-sm text-[#555555] mt-0.5">강의 준비 · 챕터를 구성하고 강의를 시작하세요</p>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          <Button variant="outline" onClick={handleSave}>저장</Button>
+          <Button variant="outline" onClick={handleSave}>임시저장</Button>
           <Button onClick={handleStartLecture}>
             <Play size={15} /> 강의 시작
           </Button>

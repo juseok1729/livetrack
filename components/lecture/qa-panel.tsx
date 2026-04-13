@@ -20,6 +20,7 @@ interface QAPanelProps {
   currentChapterId?: string
   currentChapterTitle?: string
   currentChapterSummary?: string
+  userName?: string
 }
 
 interface QuestionGroup {
@@ -72,10 +73,156 @@ function buildGroupsFromAI(
   }).filter(Boolean) as QuestionGroup[]
 }
 
-export function QAPanel({ questions, mode, onLike, onAnswer, onAnswerWithText, onSubmit, onClearAll, lectureTitle, currentChapterTitle, currentChapterSummary }: QAPanelProps) {
+// ─── Student chat mode ───────────────────────────────────────────────────────
+
+function ChatPanel({ questions, onLike, onSubmit, userName }: {
+  questions: Question[]
+  onLike?: (id: string) => void
+  onSubmit?: (content: string, name: string) => void
+  userName: string
+}) {
+  const [text, setText] = useState('')
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Sort ascending by createdAt so newest is at bottom
+  const sorted = [...questions].sort((a, b) =>
+    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  )
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [questions.length])
+
+  function send() {
+    if (!text.trim()) return
+    onSubmit?.(text.trim(), userName)
+    setText('')
+    inputRef.current?.focus()
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      send()
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
+        {sorted.length === 0 && (
+          <div className="flex flex-col items-center gap-2 py-12 text-center">
+            <MessageSquare size={24} className="text-[#cccccc]" />
+            <p className="text-xs text-[#aaaaaa]">첫 질문을 남겨보세요</p>
+          </div>
+        )}
+        {sorted.map(q => {
+          const isMe = q.studentName === userName
+          return (
+            <div key={q.id} className={`flex flex-col gap-1 ${isMe ? 'items-end' : 'items-start'}`}>
+              {/* Name label (others only) */}
+              {!isMe && (
+                <div className="flex items-center gap-1.5 ml-1">
+                  <div className="w-5 h-5 rounded-full bg-[#865FDF]/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-[9px] font-semibold text-[#865FDF]">{q.studentName[0]}</span>
+                  </div>
+                  <span className="text-[10px] text-[#aaaaaa] font-medium">{q.studentName}</span>
+                </div>
+              )}
+
+              {/* Bubble */}
+              <div
+                className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm leading-relaxed break-words
+                  ${isMe
+                    ? 'bg-[#865FDF] text-white rounded-br-sm'
+                    : 'bg-white border border-[#e5e5e5] text-[#111111] rounded-bl-sm'
+                  }
+                  ${q.answered ? 'opacity-70' : ''}
+                `}
+              >
+                {q.content}
+              </div>
+
+              {/* Answered badge + like */}
+              <div className={`flex items-center gap-2 px-1 ${isMe ? 'flex-row-reverse' : ''}`}>
+                {q.answered && (
+                  <div className="flex items-center gap-0.5 text-[#22c55e]">
+                    <CheckCheck size={11} />
+                    {q.answer && (
+                      <span className="text-[10px] text-[#555555] max-w-[160px] truncate">{q.answer}</span>
+                    )}
+                  </div>
+                )}
+                <button
+                  onClick={() => onLike?.(q.id)}
+                  className={`flex items-center gap-0.5 text-[10px] transition-colors
+                    ${q.likedByMe ? 'text-[#ef4444]' : 'text-[#cccccc] hover:text-[#ef4444]'}`}
+                >
+                  <Heart size={11} fill={q.likedByMe ? 'currentColor' : 'none'} />
+                  {q.likes > 0 && <span>{q.likes}</span>}
+                </button>
+              </div>
+            </div>
+          )
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input bar */}
+      <div className="border-t border-[#e5e5e5] px-3 py-3 flex items-center gap-2 bg-white">
+        <input
+          ref={inputRef}
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="질문을 입력하세요..."
+          className="flex-1 px-3 py-2 text-sm border border-[#e5e5e5] rounded-xl outline-none focus:border-[#865FDF] focus:ring-2 focus:ring-[#865FDF]/10 transition placeholder:text-[#cccccc]"
+        />
+        <button
+          onClick={send}
+          disabled={!text.trim()}
+          className="w-9 h-9 rounded-xl bg-[#865FDF] hover:bg-[#7450cc] disabled:opacity-40 flex items-center justify-center transition-colors flex-shrink-0"
+        >
+          <Send size={15} className="text-white" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Lecturer card mode ───────────────────────────────────────────────────────
+
+export function QAPanel({ questions, mode, onLike, onAnswer, onAnswerWithText, onSubmit, onClearAll, lectureTitle, currentChapterTitle, currentChapterSummary, userName }: QAPanelProps) {
+  // Student mode → chat UI
+  if (mode === 'student') {
+    return (
+      <ChatPanel
+        questions={questions}
+        onLike={onLike}
+        onSubmit={onSubmit}
+        userName={userName ?? '익명'}
+      />
+    )
+  }
+
+  // Lecturer mode → existing card UI
+  return <LecturerQAPanel
+    questions={questions}
+    onLike={onLike}
+    onAnswer={onAnswer}
+    onAnswerWithText={onAnswerWithText}
+    onClearAll={onClearAll}
+    lectureTitle={lectureTitle}
+    currentChapterTitle={currentChapterTitle}
+    currentChapterSummary={currentChapterSummary}
+  />
+}
+
+function LecturerQAPanel({ questions, onLike, onAnswer, onAnswerWithText, onClearAll, lectureTitle, currentChapterTitle, currentChapterSummary }: Omit<QAPanelProps, 'mode' | 'onSubmit' | 'lectureId' | 'currentChapterId' | 'userName'>) {
   const [showAnswered, setShowAnswered] = useState(false)
-  const [newQuestion, setNewQuestion] = useState('')
-  const [studentName, setStudentName] = useState('')
   const [sortMode, setSortMode] = useState<'popular' | 'recent'>('popular')
   const [aiGroups, setAiGroups] = useState<QuestionGroup[] | null>(null)
   const [grouping, setGrouping] = useState(false)
@@ -83,7 +230,6 @@ export function QAPanel({ questions, mode, onLike, onAnswer, onAnswerWithText, o
 
   const unansweredQuestions = questions.filter(q => !q.answered)
   const unansweredKey = unansweredQuestions.map(q => q.id).join(',')
-  // Keep a ref so the debounced callback always reads latest data
   const unansweredRef = useRef(unansweredQuestions)
   unansweredRef.current = unansweredQuestions
 
@@ -109,7 +255,6 @@ export function QAPanel({ questions, mode, onLike, onAnswer, onAnswerWithText, o
     }
   }, [])
 
-  // unansweredKey is a stable string — effect only re-runs when question IDs actually change
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
@@ -135,13 +280,6 @@ export function QAPanel({ questions, mode, onLike, onAnswer, onAnswerWithText, o
     })
   const answered = answeredGroups.sort((a, b) => b.totalLikes - a.totalLikes)
 
-  function handleSubmit() {
-    if (!newQuestion.trim()) return
-    onSubmit?.(newQuestion.trim(), studentName.trim() || '익명')
-    setNewQuestion('')
-    setStudentName('')
-  }
-
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -163,7 +301,7 @@ export function QAPanel({ questions, mode, onLike, onAnswer, onAnswerWithText, o
               {sortMode === 'popular' ? '인기순' : '최신순'}
             </button>
           )}
-          {mode === 'lecturer' && questions.length > 0 && onClearAll && (
+          {questions.length > 0 && onClearAll && (
             <button
               onClick={() => { if (confirm('모든 질문을 삭제하시겠습니까?')) onClearAll() }}
               className="p-1.5 rounded-lg text-[#cccccc] hover:text-[#ef4444] hover:bg-red-50 transition-colors"
@@ -174,30 +312,6 @@ export function QAPanel({ questions, mode, onLike, onAnswer, onAnswerWithText, o
           )}
         </div>
       </div>
-
-      {/* Student input */}
-      {mode === 'student' && (
-        <div className="px-4 py-3 border-b border-[#e5e5e5]">
-          <div className="flex flex-col gap-2">
-            <input
-              placeholder="이름 (선택)"
-              value={studentName}
-              onChange={e => setStudentName(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-[#e5e5e5] rounded-lg outline-none focus:border-[#865FDF] placeholder:text-[#cccccc]"
-            />
-            <Textarea
-              placeholder="질문을 입력하세요..."
-              value={newQuestion}
-              onChange={e => setNewQuestion(e.target.value)}
-              rows={2}
-              className="text-xs"
-            />
-            <Button size="sm" onClick={handleSubmit} disabled={!newQuestion.trim()}>
-              질문 등록
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Questions list */}
       <div className="flex-1 overflow-y-auto">
@@ -212,7 +326,7 @@ export function QAPanel({ questions, mode, onLike, onAnswer, onAnswerWithText, o
             <GroupCard
               key={g.key}
               group={g}
-              mode={mode}
+              mode="lecturer"
               lectureTitle={lectureTitle}
               chapterTitle={currentChapterTitle}
               chapterSummary={currentChapterSummary}
@@ -236,7 +350,7 @@ export function QAPanel({ questions, mode, onLike, onAnswer, onAnswerWithText, o
               <GroupCard
                 key={g.key}
                 group={g}
-                mode={mode}
+                mode="lecturer"
                 onLike={() => onLike?.(g.representativeId)}
                 onAnswer={() => {}}
                 onAnswerWithText={() => {}}
@@ -306,7 +420,6 @@ function GroupCard({ group: g, mode, onLike, onAnswer, onAnswerWithText, lecture
       onClick={() => !g.answered && setExpanded(v => !v)}
     >
       <div className="p-3">
-        {/* Who asked */}
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-1">
             {g.names.slice(0, 3).map((name, i) => (
@@ -338,7 +451,6 @@ function GroupCard({ group: g, mode, onLike, onAnswer, onAnswerWithText, lecture
 
         <p className="text-sm text-[#111111] leading-relaxed mb-2">{g.content}</p>
 
-        {/* Answer text (if answered with text) */}
         {g.answered && g.answer && (
           <div className="mt-1 mb-2 pl-3 border-l-2 border-[#865FDF]/30">
             <p className="text-xs text-[#555555] leading-relaxed">{g.answer}</p>
@@ -369,7 +481,6 @@ function GroupCard({ group: g, mode, onLike, onAnswer, onAnswerWithText, lecture
         </div>
       </div>
 
-      {/* Individual question list — shown when group has multiple members and is expanded */}
       {expanded && g.members.length > 1 && (
         <div className="px-3 pb-2 border-t border-[#f3f3f3] pt-2" onClick={e => e.stopPropagation()}>
           <p className="text-[10px] font-semibold text-[#aaaaaa] uppercase tracking-wide mb-1.5">묶인 질문 ({g.members.length}개)</p>
@@ -384,7 +495,6 @@ function GroupCard({ group: g, mode, onLike, onAnswer, onAnswerWithText, lecture
         </div>
       )}
 
-      {/* Answer input — lecturer mode, expanded */}
       {mode === 'lecturer' && expanded && !g.answered && (
         <div className="px-3 pb-3 border-t border-[#f3f3f3] pt-2.5" onClick={e => e.stopPropagation()}>
           <Textarea

@@ -369,6 +369,7 @@ export default function StudentJoinPage({ params }: { params: Promise<{ code: st
                 currentChapterId={session?.currentChapterId}
                 onLike={handleLike}
                 onSubmit={handleSubmitQuestion}
+                userName={user.name}
               />
             )}
           </div>
